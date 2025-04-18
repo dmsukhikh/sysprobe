@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.2)
 project('sysprobe')
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDART 17)
 
 # Может быть или Windows, или Linux
 if (NOT DEFINED SYSPROBE_SYSTEM_NAME)
@@ -13,8 +14,8 @@ if (NOT DEFINED CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-# Флаги компиляции для дебаг-сборки
 set(COMPILE_FLAGS -std=c++17)
+# Флаги компиляции для дебаг-сборки
 if (CMAKE_BUILD_TYPE STREQUAL Debug)
     list(APPEND COMPILE_FLAGS -Wall -Wextra -Wpedantic 
     -g -fsanitize=address -fsanitize=leak)
