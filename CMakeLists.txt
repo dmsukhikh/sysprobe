@@ -10,8 +10,8 @@ endif()
 message("Generating build files for \'${SYSPROBE_SYSTEM_NAME}\'...")
 
 # Вид сборки: Debug или Release
-if (NOT DEFINED CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug)
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Debug" FORCE)
 endif()
 
 set(COMPILE_FLAGS -std=c++17)
