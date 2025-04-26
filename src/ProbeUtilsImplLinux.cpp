@@ -2,9 +2,11 @@
 #include <ProbeUtilsImplLinux.hpp>
 #include <cstdint>
 #include <functional>
+#include <iostream>
 #include <netinet/in.h>
 #include <sys/utsname.h>
 #include <stdexcept>
+#include <thread>
 #include <utmp.h>
 #include <chrono>
 #include <fstream>
@@ -13,8 +15,10 @@
 #include <arpa/inet.h>
 
 
+
 using putils = info::ProbeUtilities;
 using namespace nlohmann;
+using namespace std::chrono_literals;
 
 // Хардкод по всем возможным значениям uname -m
 const std::unordered_map<std::string, decltype(info::OSInfo::arch)>
@@ -259,5 +263,98 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
     return output;
 }
 
-info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() { return {}; }
+info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() 
+{ 
+    CPUInfo output;
+
+    output.l1_cache = 0;
+    output.l2_cache = 0;
+    output.l3_cache = 0;
+
+    getOSInfo();
+    output.arch = _osinfo->machine;
+    
+    std::ifstream rawCPUInfo("/proc/cpuinfo");
+
+    // hoho haha
+    int i = 0;
+    for (std::string line; std::getline(rawCPUInfo, line);)
+    {
+        if (line.find("model name") != std::string::npos)
+        {
+            output.name = std::string(line.begin() + line.find(":") + 2, line.end());
+            ++i;
+        }
+        else if (line.find("cpu cores") != std::string::npos)
+        {
+            output.cores = std::stoi(
+                std::string(line.begin() + line.find(":") + 2, line.end()));
+            ++i;
+        }
+        if (i == 2) break;
+    }
+    
+    // Получаем емкость кэшей
+    std::system("lscpu -C --json --bytes > cpuinfo.json");
+    std::ifstream cacheInfoRaw("cpuinfo.json");
+    auto cacheInfo = json::parse(cacheInfoRaw);
+
+    for (const auto &entry: cacheInfo["caches"])
+    {
+        auto name = entry["name"].get<std::string>();
+        uint64_t capacity = std::stoll(entry["all-size"].get<std::string>());
+
+        if (name == "L1d")
+        {
+            output.l1_cache = capacity;
+        }
+        else if (name == "L2")
+        {
+            output.l2_cache = capacity;
+        }
+        else if (name == "L3")
+        {
+            output.l3_cache = capacity;
+        }
+    }
+
+    // Получаем загруженность процессора
+    auto getTicks = []()
+    {
+        std::vector<std::pair<uint64_t, uint64_t>> output;
+        std::system("cat /proc/stat | grep \"cpu\" > loadinfo.txt");
+        std::ifstream st("loadinfo.txt");
+
+        for (std::string line, stub; getline(st, line); )
+        {
+            std::stringstream parsedLine(line);
+            parsedLine >> stub;
+            if (stub == "cpu") continue;
+
+            // Числа под номерами 4,5 - такты в простое
+            uint64_t all = 0, useful = 0;
+            for (uint64_t i = 1, cur; parsedLine; ++i)
+            {
+                parsedLine >> cur;
+                if (!(i == 4 || i == 5)) useful += cur;
+                all += cur;
+            }
+            output.emplace_back(useful, all);
+        }
+        return output;
+    };
+
+    auto f1 = getTicks();
+    std::this_thread::sleep_for(1s);
+    auto f2 = getTicks();
+
+    for (std::size_t i = 0; i < f2.size(); ++i)
+    {
+        std::pair<uint64_t, uint64_t> diff = {f2[i].first - f1[i].first,
+                                              f2[i].second - f1[i].second};
+        output.load.push_back(static_cast<double>(diff.first)/diff.second);
+    }
+
+    return output;
+}
 
