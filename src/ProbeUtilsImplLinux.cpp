@@ -2,6 +2,7 @@
 #include <ProbeUtilsImplLinux.hpp>
 #include <cstdint>
 #include <functional>
+#include <netinet/in.h>
 #include <sys/utsname.h>
 #include <stdexcept>
 #include <utmp.h>
@@ -9,6 +10,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <cstdlib>
+#include <arpa/inet.h>
 
 
 using putils = info::ProbeUtilities;
@@ -192,7 +194,69 @@ std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
 std::vector<info::NetworkInterfaceInfo>
 putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
 {
-    return std::vector<info::NetworkInterfaceInfo>(0);
+    std::system("ip -j addr show > netinfo.json");
+    std::ifstream rawNInfo("netinfo.json");
+        
+    std::vector<NetworkInterfaceInfo> output;
+    for (const auto &interface: json::parse(rawNInfo))
+    {
+        NetworkInterfaceInfo curIF;
+        // Такое се, нужно поменять интерфейс
+        curIF.ipv4 = std::nullopt;
+        curIF.ipv6 = std::nullopt;
+        curIF.mac = std::nullopt;
+
+
+        curIF.name = interface["ifname"].get<std::string>();
+        if (interface.count("address"))
+        {
+            std::stringstream macraw(interface["address"].get<std::string>());
+            std::array<uint8_t, 6> mac;
+            int i = 0;
+            std::string temp;
+            while (std::getline(macraw, temp, ':'))
+            {
+                mac[i++] = std::stoi(temp, nullptr, 16); 
+            }
+            curIF.mac = mac;
+        }
+
+        // Ищем ip-адреса
+        if (interface.count("addr_info"))
+        {
+            for (const auto &ipinfo: interface["addr_info"])
+            {
+                if (ipinfo["family"].get<std::string>() == "inet")
+                {
+                    curIF.ipv4.emplace();
+                    std::string pres = ipinfo["local"].get<std::string>();
+                    char networkformat[4];
+                    inet_pton(AF_INET, pres.c_str(), &networkformat);
+                    std::copy(std::begin(networkformat),
+                              std::end(networkformat),
+                              curIF.ipv4.value().begin());
+                    curIF.ipv4_mask = ipinfo["prefixlen"].get<uint8_t>();
+                }
+                else if (ipinfo["family"].get<std::string>() == "inet6")
+                {
+                    curIF.ipv6.emplace();
+                    std::string pres = ipinfo["local"].get<std::string>();
+                    char networkformat[sizeof(in6_addr)];
+                    inet_pton(AF_INET6, pres.c_str(), networkformat);
+                    std::copy(std::begin(networkformat),
+                              std::end(networkformat),
+                              curIF.ipv6.value().begin());
+                    curIF.ipv6_mask = ipinfo["prefixlen"].get<uint8_t>();
+                }
+            }
+        }
+        output.push_back(curIF);
+    }
+
+    rawNInfo.close();
+    std::system("rm netinfo.json");
+
+    return output;
 }
 
 info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() { return {}; }
