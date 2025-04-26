@@ -34,6 +34,7 @@ class ProbeUtilities::ProbeUtilsImpl
     static const std::unordered_map<std::string, decltype(OSInfo::arch)>
         _OS_BITNESS;
     std::optional<utsname> _osinfo{std::nullopt};
+    std::optional<std::vector<DiscPartitionInfo>> _cached_DPInfo{std::nullopt};
 };
 
 } // namespace info

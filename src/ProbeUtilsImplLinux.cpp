@@ -1,13 +1,17 @@
 #include <ProbeUtilities.hpp>
 #include <ProbeUtilsImplLinux.hpp>
+#include <cstdint>
 #include <sys/utsname.h>
 #include <stdexcept>
 #include <utmp.h>
 #include <chrono>
 #include <fstream>
+#include <nlohmann/json.hpp>
+#include <cstdlib>
 
 
 using putils = info::ProbeUtilities;
+using namespace nlohmann;
 
 // Хардкод по всем возможным значениям uname -m
 const std::unordered_map<std::string, decltype(info::OSInfo::arch)>
@@ -95,7 +99,43 @@ std::vector<info::UserInfo> putils::ProbeUtilsImpl::getUserInfo()
 std::vector<info::DiscPartitionInfo>
 putils::ProbeUtilsImpl::getDiscPartitionInfo()
 {
-    return std::vector<info::DiscPartitionInfo>(0);
+    if (!_cached_DPInfo.has_value())
+    {
+        _cached_DPInfo.emplace();
+
+        std::system(
+            "lsblk --output NAME,MOUNTPOINT,FSTYPE,SIZE,FSAVAIL,FSUSED,TYPE "
+            "--json --bytes > dpinfo.json");
+        std::ifstream dpinfo("dpinfo.json");
+        json dpinfoParsed = json::parse(dpinfo);
+
+        auto &output = _cached_DPInfo.value();
+        for (const auto &disc : dpinfoParsed["blockdevices"])
+        {
+            for (const auto &part : disc["children"])
+            {
+                // Generic lambda для удобного извлечения значения, которое
+                // может быть null
+                auto extract = [](const json &couple, const auto defval)
+                {
+                    return !couple.is_null() ? couple.get<decltype(defval)>() : defval;
+                };
+
+                DiscPartitionInfo infoToPush{
+                    extract(part["name"], std::string{"null"}),
+                    extract(part["mountpoint"], std::string{"null"}),
+                    extract(part["fstype"], std::string{"null"}),
+                    extract(part["size"], uint64_t{0}),
+                    extract(part["fsavail"], uint64_t{0})};
+                output.push_back(infoToPush);
+            }
+        }
+
+        dpinfo.close();
+        std::system("rm dpinfo.json");
+    }
+
+    return _cached_DPInfo.value();
 }
 
 std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
