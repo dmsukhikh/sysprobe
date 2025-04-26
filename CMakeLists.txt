@@ -27,17 +27,17 @@ FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download
 FetchContent_MakeAvailable(json)
 target_link_libraries(build_features INTERFACE nlohmann_json::nlohmann_json)
 
-add_library(probe_utilities STATIC src/ProbeUtilities.cpp)
+add_library(probe_utilities STATIC ${CMAKE_SOURCE_DIR}/src/ProbeUtilities.cpp)
 
 if (WIN32)
-    target_sources(probe_utilities PUBLIC src/ProbeUtilsImplWin.cpp)
+    target_sources(probe_utilities PUBLIC 
+                  ${CMAKE_SOURCE_DIR}/src/ProbeUtilsImplWin.cpp)
     target_compile_definitions(probe_utilities PRIVATE TARGET_SYSTEM=0)
 elseif(UNIX)
-    target_sources(probe_utilities PUBLIC src/ProbeUtilsImplLinux.cpp)
+    target_sources(probe_utilities PUBLIC 
+                  ${CMAKE_SOURCE_DIR}/src/ProbeUtilsImplLinux.cpp)
     target_compile_definitions(probe_utilities PRIVATE TARGET_SYSTEM=1)
 else()
     message(FATAL_ERROR "Your platform isn't valid\n"
                         "List of supported platforms: \'Linux\', \'Windows\'")
 endif()
-
-target_link_libraries(probe_utilities PUBLIC build_features)
