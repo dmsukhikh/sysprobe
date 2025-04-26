@@ -1,6 +1,7 @@
 #include <ProbeUtilities.hpp>
 #include <ProbeUtilsImplLinux.hpp>
 #include <cstdint>
+#include <functional>
 #include <sys/utsname.h>
 #include <stdexcept>
 #include <utmp.h>
@@ -32,6 +33,9 @@ const std::unordered_map<std::string, decltype(info::OSInfo::arch)>
         {"i686", 32},       {"x86_64", 64},    {"x64", 64},
         {"xtensa", 32},     {"arm64", 64},     {"amd64", 64},
         {"i486", 32},       {"i586", 32}};
+
+const std::unordered_set<std::string> putils::ProbeUtilsImpl::_DESIRED_CLASSES =
+    {"multimedia", "communication", "printer", "input", "display"};
 
 putils::ProbeUtilsImpl::ProbeUtilsImpl() 
 {
@@ -66,7 +70,7 @@ info::OSInfo putils::ProbeUtilsImpl::getOSInfo()
 
 std::vector<info::UserInfo> putils::ProbeUtilsImpl::getUserInfo()
 {
-    // Не кешируется, потому что пользователи могут добавится в 
+    // Не кэшируется, потому что пользователи могут добавится в 
     // рантайме
 
     std::fstream utmpFile("/var/run/utmp",
@@ -110,17 +114,15 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
         json dpinfoParsed = json::parse(dpinfo);
 
         auto &output = _cached_DPInfo.value();
+        // Generic lambda для удобного извлечения значения, которое
+        // может быть null
+        auto extract = [](const json &couple, const auto defval)
+        { return !couple.is_null() ? couple.get<decltype(defval)>() : defval; };
+
         for (const auto &disc : dpinfoParsed["blockdevices"])
         {
             for (const auto &part : disc["children"])
             {
-                // Generic lambda для удобного извлечения значения, которое
-                // может быть null
-                auto extract = [](const json &couple, const auto defval)
-                {
-                    return !couple.is_null() ? couple.get<decltype(defval)>() : defval;
-                };
-
                 DiscPartitionInfo infoToPush{
                     extract(part["name"], std::string{"null"}),
                     extract(part["mountpoint"], std::string{"null"}),
@@ -140,8 +142,51 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
 
 std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
 {
+    // Не кэшируется, потому что периферийные устройства могут быть подключены
+    // в рантаймe
 
-    return std::vector<info::PeripheryInfo>(0);
+    std::system("lshw -json > perinfo.json");
+    std::ifstream rawPerInfo("perinfo.json");
+
+    // Реализуем DFS для мощного обхода json'a
+    std::vector<PeripheryInfo> output;
+
+    std::function<void(const json &)> traverse =
+        [&traverse, &output](const json &entry)
+    {
+        auto cls = entry["class"].get<std::string>();
+        if (_DESIRED_CLASSES.count(cls))
+        {
+            std::string name;
+
+            if (entry.count("vendor"))
+                name += entry["vendor"].get<std::string>() + " ";
+            if (entry.count("product"))
+                name += entry["product"].get<std::string>() + " ";
+            if (entry.count("description"))
+                name += "| " + entry["description"].get<std::string>() + " ";
+            if (entry.count("id"))
+                name += entry["id"].get<std::string>() + " ";
+
+            name.pop_back();
+
+            output.push_back({name, cls});
+        }
+
+        if (entry.count("children"))
+        {
+            for (const auto &child : entry["children"])
+            {
+                traverse(child);
+            }
+        }
+    };
+
+    traverse(json::parse(rawPerInfo));
+    rawPerInfo.close();
+    std::system("rm perinfo.json");
+
+    return output;
 }
 
 std::vector<info::NetworkInterfaceInfo>
@@ -151,3 +196,4 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
 }
 
 info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() { return {}; }
+

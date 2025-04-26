@@ -1,7 +1,9 @@
 #ifndef __PROBE_UTILS_IMPL_LINUX
 #define __PROBE_UTILS_IMPL_LINUX
+#include <nlohmann/json.hpp>
 #include <ProbeUtilities.hpp>
 #include <unordered_map>
+#include <unordered_set>
 #include <optional>
 #include <sys/utsname.h>
 
@@ -33,6 +35,7 @@ class ProbeUtilities::ProbeUtilsImpl
   private:
     static const std::unordered_map<std::string, decltype(OSInfo::arch)>
         _OS_BITNESS;
+    static const std::unordered_set<std::string> _DESIRED_CLASSES;
     std::optional<utsname> _osinfo{std::nullopt};
     std::optional<std::vector<DiscPartitionInfo>> _cached_DPInfo{std::nullopt};
 };
