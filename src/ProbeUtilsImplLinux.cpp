@@ -2,6 +2,9 @@
 #include <ProbeUtilsImplLinux.hpp>
 #include <sys/utsname.h>
 #include <stdexcept>
+#include <utmp.h>
+#include <chrono>
+#include <fstream>
 
 
 using putils = info::ProbeUtilities;
@@ -59,7 +62,34 @@ info::OSInfo putils::ProbeUtilsImpl::getOSInfo()
 
 std::vector<info::UserInfo> putils::ProbeUtilsImpl::getUserInfo()
 {
-    return std::vector<info::UserInfo>(0);
+    // Не кешируется, потому что пользователи могут добавится в 
+    // рантайме
+
+    std::fstream utmpFile("/var/run/utmp",
+                           std::ios_base::in | std::ios_base::binary);
+    if (!utmpFile)
+    {
+        return {};
+    }
+    
+    std::vector<UserInfo> output;
+    for (utmp userEntryRaw;
+         utmpFile.read(reinterpret_cast<char *>(&userEntryRaw), sizeof(utmp));)
+    {
+        UserInfo userEntry;
+        if (userEntryRaw.ut_type == USER_PROCESS)
+        {
+            userEntry.name = userEntryRaw.ut_user;
+            const std::time_t raw_last_log = userEntryRaw.ut_tv.tv_sec;
+            userEntry.lastLog =
+                std::chrono::system_clock::from_time_t(raw_last_log);
+            userEntry.uptime =
+                std::chrono::system_clock::now() - userEntry.lastLog;
+            output.push_back(userEntry);
+        }
+    }
+
+    return output;
 }
 
 std::vector<info::DiscPartitionInfo>
