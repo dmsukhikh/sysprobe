@@ -30,6 +30,8 @@ class ProbeUtilities::ProbeUtilsImpl
 
     std::vector<NetworkInterfaceInfo> getNetworkInterfaceInfo();
 
+    MemoryInfo getMemoryInfo();
+
     CPUInfo getCPUInfo();
 
   private:

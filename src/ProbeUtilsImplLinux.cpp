@@ -370,3 +370,32 @@ void putils::ProbeUtilsImpl::_getCPUBasicInfo(CPUInfo &output)
         if (i == 2) break;
     }
 }
+
+info::MemoryInfo putils::ProbeUtilsImpl::getMemoryInfo()
+{
+    MemoryInfo output;
+    std::ifstream cacheInfoRaw("/proc/meminfo");
+    for (std::string line, it; getline(cacheInfoRaw, line);)
+    {
+        std::stringstream lineParsed(line);
+        if (line.find("MemTotal") != std::string::npos)
+        {
+            // Скипаем 
+            lineParsed >> it;
+            lineParsed >> it;
+            // Там все дается в килобайтах
+            output.capacity = std::stoll(it) * 1024; 
+        }
+        else if (line.find("MemAvailable") != std::string::npos)
+        {
+            // Скипаем 
+            lineParsed >> it;
+            lineParsed >> it;
+            output.freeSpace = std::stoll(it) * 1024; 
+            // Дальше парсить смысла нет
+            break;
+        }
+    }
+    return output;
+}
+
