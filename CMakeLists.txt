@@ -41,3 +41,5 @@ else()
     message(FATAL_ERROR "Your platform isn't valid\n"
                         "List of supported platforms: \'Linux\', \'Windows\'")
 endif()
+
+target_link_libraries(probe_utilities PUBLIC build_features)
