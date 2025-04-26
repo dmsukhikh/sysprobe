@@ -37,3 +37,8 @@ info::ProbeUtilities::getNetworkInterfaceInfo()
 }
 
 info::CPUInfo info::ProbeUtilities::getCPUInfo() { return _impl->getCPUInfo(); }
+
+info::MemoryInfo info::ProbeUtilities::getMemoryInfo()
+{
+    return _impl->getMemoryInfo();
+}
