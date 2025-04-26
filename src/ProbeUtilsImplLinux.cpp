@@ -271,53 +271,15 @@ info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo()
     output.l2_cache = 0;
     output.l3_cache = 0;
 
-    getOSInfo();
-    output.arch = _osinfo->machine;
-    
-    std::ifstream rawCPUInfo("/proc/cpuinfo");
+    _getCPUBasicInfo(output); 
+    _getCPUCache(output);
+    _getCPULoadness(output);
 
-    // hoho haha
-    int i = 0;
-    for (std::string line; std::getline(rawCPUInfo, line);)
-    {
-        if (line.find("model name") != std::string::npos)
-        {
-            output.name = std::string(line.begin() + line.find(":") + 2, line.end());
-            ++i;
-        }
-        else if (line.find("cpu cores") != std::string::npos)
-        {
-            output.cores = std::stoi(
-                std::string(line.begin() + line.find(":") + 2, line.end()));
-            ++i;
-        }
-        if (i == 2) break;
-    }
-    
-    // Получаем емкость кэшей
-    std::system("lscpu -C --json --bytes > cpuinfo.json");
-    std::ifstream cacheInfoRaw("cpuinfo.json");
-    auto cacheInfo = json::parse(cacheInfoRaw);
+    return output;
+}
 
-    for (const auto &entry: cacheInfo["caches"])
-    {
-        auto name = entry["name"].get<std::string>();
-        uint64_t capacity = std::stoll(entry["all-size"].get<std::string>());
-
-        if (name == "L1d")
-        {
-            output.l1_cache = capacity;
-        }
-        else if (name == "L2")
-        {
-            output.l2_cache = capacity;
-        }
-        else if (name == "L3")
-        {
-            output.l3_cache = capacity;
-        }
-    }
-
+void putils::ProbeUtilsImpl::_getCPULoadness(CPUInfo &output) 
+{
     // Получаем загруженность процессора
     auto getTicks = []()
     {
@@ -354,7 +316,57 @@ info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo()
                                               f2[i].second - f1[i].second};
         output.load.push_back(static_cast<double>(diff.first)/diff.second);
     }
-
-    return output;
 }
 
+void putils::ProbeUtilsImpl::_getCPUCache(CPUInfo &output) 
+{
+    // Получаем емкость кэшей
+    std::system("lscpu -C --json --bytes > cpuinfo.json");
+    std::ifstream cacheInfoRaw("cpuinfo.json");
+    auto cacheInfo = json::parse(cacheInfoRaw);
+
+    for (const auto &entry: cacheInfo["caches"])
+    {
+        auto name = entry["name"].get<std::string>();
+        uint64_t capacity = std::stoll(entry["all-size"].get<std::string>());
+
+        if (name == "L1d")
+        {
+            output.l1_cache = capacity;
+        }
+        else if (name == "L2")
+        {
+            output.l2_cache = capacity;
+        }
+        else if (name == "L3")
+        {
+            output.l3_cache = capacity;
+        }
+    }
+}
+
+void putils::ProbeUtilsImpl::_getCPUBasicInfo(CPUInfo &output) 
+{
+    getOSInfo();
+    output.arch = _osinfo->machine;
+    
+    std::ifstream rawCPUInfo("/proc/cpuinfo");
+
+    // hoho haha
+    int i = 0;
+    for (std::string line; std::getline(rawCPUInfo, line);)
+    {
+        if (line.find("model name") != std::string::npos)
+        {
+            output.name = std::string(line.begin() + line.find(":") + 2, line.end());
+            ++i;
+        }
+        else if (line.find("cpu cores") != std::string::npos)
+        {
+            output.cores = std::stoi(
+                std::string(line.begin() + line.find(":") + 2, line.end()));
+            ++i;
+        }
+        if (i == 2) break;
+    }
+}

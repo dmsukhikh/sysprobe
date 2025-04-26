@@ -38,6 +38,10 @@ class ProbeUtilities::ProbeUtilsImpl
     static const std::unordered_set<std::string> _DESIRED_CLASSES;
     std::optional<utsname> _osinfo{std::nullopt};
     std::optional<std::vector<DiscPartitionInfo>> _cached_DPInfo{std::nullopt};
+
+    void _getCPULoadness(CPUInfo &write);
+    void _getCPUCache(CPUInfo &write);
+    void _getCPUBasicInfo(CPUInfo &write);
 };
 
 } // namespace info
