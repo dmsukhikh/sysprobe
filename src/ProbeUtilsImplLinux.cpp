@@ -136,7 +136,7 @@ std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
     {
         // generic используется в lshw, когда не указано класса
         auto cls = entry.value("class", std::string("generic"));
-        if (_DESIRED_CLASSES.count(cls))
+        if (_DESIRED_CLASSES.count(cls) != 0)
         {
             std::string name;
 
@@ -183,7 +183,7 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
         curIF.name = interface["ifname"].get<std::string>();
 
         // Если address не указан, продолжать дальше нет смысла
-        if (interface.count("address"))
+        if (interface.contains("address"))
         {
             std::stringstream macraw(interface["address"].get<std::string>());
             std::array<uint8_t, 6> mac;
@@ -197,7 +197,7 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
         }
 
         // Ищем ip-адреса
-        if (interface.count("addr_info"))
+        if (interface.contains("addr_info"))
         {
             // Если поле addr_info есть, то остальные аттрибуты также
             // указываются утилитой ip, значит, можно не оборачивать их в value
