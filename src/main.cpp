@@ -46,7 +46,8 @@ void __test_UserInfo(info::ProbeUtilities& probe)
         std::cout << "Last log time: " << std::ctime(&epoch_time);
         std::cout
             << "Uptime: "
-            << std::chrono::duration_cast<std::chrono::hours>(d.uptime).count()
+            << std::chrono::duration_cast<std::chrono::minutes>(d.uptime).count()
+            << " minutes"
             << std::endl;
         std::cout << std::endl;
     }
