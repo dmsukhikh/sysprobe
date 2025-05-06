@@ -178,9 +178,7 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
         curIF.ipv4 = std::nullopt;
         curIF.ipv6 = std::nullopt;
         curIF.mac = std::nullopt;
-
-
-        curIF.name = interface["ifname"].get<std::string>();
+        curIF.name = interface.value("ifname", std::string());
 
         // Если address не указан, продолжать дальше нет смысла
         if (interface.contains("address"))
