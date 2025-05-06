@@ -43,3 +43,6 @@ else()
 endif()
 
 target_link_libraries(probe_utilities PUBLIC build_features)
+
+add_executable(main src/main.cpp)
+target_link_libraries(main PUBLIC probe_utilities)
