@@ -344,7 +344,27 @@ void putils::ProbeUtilsImpl::_getCPUBasicInfo(CPUInfo &output)
                 std::string(line.begin() + line.find(":") + 2, line.end()));
             ++i;
         }
-        if (i == 2) break;
+        else if (line.find("physical id") != std::string::npos)
+        {
+            output.physid = std::stoi(
+                std::string(line.begin() + line.find(":") + 2, line.end()));
+            ++i;
+        }
+        else if (line.find("cpu MHz") != std::string::npos)
+        {
+            output.clockFreq = std::stof(
+                std::string(line.begin() + line.find(":") + 2, line.end()));
+            ++i;
+        }
+        else if (line.find("cache size") != std::string::npos)
+        {
+            // Я надеюсь, что вывод /proc/cpuinfo не поменяется
+            output.overall_cache = std::stoi(
+                std::string(line.begin() + line.find(":") + 2, line.end() - 3));
+            output.overall_cache *= 1024;
+            ++i;
+        }
+        if (i == 5) break;
     }
 }
 

@@ -77,7 +77,10 @@ struct CPUInfo
     std::string arch;
     uint8_t cores;
     std::vector<float> load; // Загрузка каждого ядра
-    uint64_t l1_cache, l2_cache, l3_cache; // capacity
+    uint64_t l1_cache, l2_cache, l3_cache, overall_cache; // capacity, in bytes
+    // overall_cache - cache, берущийся из /proc/cpuinfo на linux
+    uint64_t physid;
+    float clockFreq; // in mhz
 };
 
 struct MemoryInfo
