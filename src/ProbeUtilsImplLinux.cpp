@@ -91,14 +91,17 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
         json dpinfoParsed = json::parse(dpinfo);
 
         auto &output = _cached_DPInfo.value();
+
         // Generic lambda для удобного извлечения значения, которое
         // может быть null
         auto extract = [](const json &couple, const auto defval)
         { return !couple.is_null() ? couple.get<decltype(defval)>() : defval; };
 
-        for (const auto &disc : dpinfoParsed["blockdevices"])
+        for (const auto &disc :
+             dpinfoParsed.value("blockdevices", nlohmann::basic_json<>{}))
         {
-            for (const auto &part : disc["children"])
+            for (const auto &part :
+                 disc.value("children", nlohmann::basic_json<>{}))
             {
                 DiscPartitionInfo infoToPush{
                     extract(part["name"], std::string{"null"}),
@@ -131,31 +134,26 @@ std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
     std::function<void(const json &)> traverse =
         [&traverse, &output](const json &entry)
     {
-        auto cls = entry["class"].get<std::string>();
+        // generic используется в lshw, когда не указано класса
+        auto cls = entry.value("class", std::string("generic"));
         if (_DESIRED_CLASSES.count(cls))
         {
             std::string name;
 
-            if (entry.count("vendor"))
-                name += entry["vendor"].get<std::string>() + " ";
-            if (entry.count("product"))
-                name += entry["product"].get<std::string>() + " ";
-            if (entry.count("description"))
-                name += "| " + entry["description"].get<std::string>() + " ";
-            if (entry.count("id"))
-                name += entry["id"].get<std::string>() + " ";
+            name += entry.value("vendor", std::string()) + " ";
+            name += entry.value("product", std::string()) + " ";
+            name += "| " + entry.value("description", std::string()) + " ";
+            name += entry.value("id", std::string()) + " ";
 
             name.pop_back();
 
             output.push_back({name, cls});
         }
 
-        if (entry.count("children"))
+        for (const auto &child :
+             entry.value("children", nlohmann::basic_json<>{}))
         {
-            for (const auto &child : entry["children"])
-            {
-                traverse(child);
-            }
+            traverse(child);
         }
     };
 
@@ -183,6 +181,8 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
 
 
         curIF.name = interface["ifname"].get<std::string>();
+
+        // Если address не указан, продолжать дальше нет смысла
         if (interface.count("address"))
         {
             std::stringstream macraw(interface["address"].get<std::string>());
@@ -199,7 +199,10 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
         // Ищем ip-адреса
         if (interface.count("addr_info"))
         {
-            for (const auto &ipinfo: interface["addr_info"])
+            // Если поле addr_info есть, то остальные аттрибуты также
+            // указываются утилитой ip, значит, можно не оборачивать их в value
+
+            for (const auto &ipinfo : interface["addr_info"])
             {
                 if (ipinfo["family"].get<std::string>() == "inet")
                 {
@@ -296,8 +299,11 @@ void putils::ProbeUtilsImpl::_getCPUCache(CPUInfo &output)
     std::ifstream cacheInfoRaw("cpuinfo.json");
     auto cacheInfo = json::parse(cacheInfoRaw);
 
-    for (const auto &entry: cacheInfo["caches"])
+    for (const auto &entry :
+         cacheInfo.value("caches", nlohmann::basic_json<>{}))
     {
+        // Если поле caches есть, то остальные аттрибуты также
+        // указываются утилитой lscpu, значит, можно не оборачивать их в value
         auto name = entry["name"].get<std::string>();
         uint64_t capacity = std::stoll(entry["all-size"].get<std::string>());
 
