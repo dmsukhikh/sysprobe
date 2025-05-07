@@ -1,6 +1,10 @@
 #ifndef __PROBE_UTILS_IMPL_LINUX
 #define __PROBE_UTILS_IMPL_LINUX
+#include <nlohmann/json.hpp>
 #include <ProbeUtilities.hpp>
+#include <unordered_set>
+#include <optional>
+#include <sys/utsname.h>
 
 /*
  * Класс-реализация сканирования системы для ОС Windows
@@ -25,7 +29,18 @@ class ProbeUtilities::ProbeUtilsImpl
 
     std::vector<NetworkInterfaceInfo> getNetworkInterfaceInfo();
 
+    MemoryInfo getMemoryInfo();
+
     CPUInfo getCPUInfo();
+
+  private:
+    static const std::unordered_set<std::string> _DESIRED_CLASSES;
+    std::optional<utsname> _osinfo{std::nullopt};
+    std::optional<std::vector<DiscPartitionInfo>> _cached_DPInfo{std::nullopt};
+
+    void _getCPULoadness(CPUInfo &write);
+    void _getCPUCache(CPUInfo &write);
+    void _getCPUBasicInfo(CPUInfo &write);
 };
 
 } // namespace info
