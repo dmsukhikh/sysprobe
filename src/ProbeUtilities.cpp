@@ -6,7 +6,7 @@
 static_assert(false, "Unknown target system. See CMakeLists for info");
 #endif
 
-#include "ProbeUtilities.hpp"
+#include <ProbeUtilities.hpp>
 
 info::ProbeUtilities::ProbeUtilities() : _impl(new ProbeUtilsImpl) {}
 

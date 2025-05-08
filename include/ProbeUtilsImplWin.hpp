@@ -12,7 +12,7 @@ namespace info
 {
 class ProbeUtilities::ProbeUtilsImpl
 {
-  public:
+public:
     ProbeUtilsImpl();
     ~ProbeUtilsImpl();
     OSInfo getOSInfo();
@@ -26,6 +26,8 @@ class ProbeUtilities::ProbeUtilsImpl
     std::vector<NetworkInterfaceInfo> getNetworkInterfaceInfo();
 
     CPUInfo getCPUInfo();
+private:
+    std::string _execCommand(const char* cmd) const;
 };
 
 } // namespace info
