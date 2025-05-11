@@ -1,5 +1,7 @@
 #include <ProbeUtilities.hpp>
 #include <iostream>
+#include <iomanip> // Для put_time
+
 
 void __test_OSInfo(info::ProbeUtilities& probe) 
 {
@@ -28,6 +30,12 @@ void __test_DiscPartitionInfo(info::ProbeUtilities& probe)
 void __test_UserInfo(info::ProbeUtilities& probe)
 {
     std::cout << "\n------TestUserInfo------\n";
+    auto user = probe.getUserInfo()[0]; //single-user windows
+    std::time_t lastLogin = std::chrono::system_clock::to_time_t(user.lastLog);
+    std::cout << "User:       " << user.name << "\n";
+    std::cout << "Last login: "
+              << std::put_time(std::localtime(&lastLogin), "%c") << "\n";
+    std::cout << "Uptime:     " << user.uptime.count() << " seconds\n";
 }
 
 void __test_CPUInfo(info::ProbeUtilities& probe)
