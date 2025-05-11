@@ -27,6 +27,7 @@ class ProbeUtilities::ProbeUtilsImpl
 
     CPUInfo getCPUInfo();
 
+    MemoryInfo getMemoryInfo();
   private:
     std::string _execCommand(const std::string &command) const;
 };
