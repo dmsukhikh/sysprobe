@@ -4,7 +4,7 @@
 
 /*
  * Класс-реализация сканирования системы для ОС Windows
- * Одновременно должен быть включен только один файл: 
+ * Одновременно должен быть включен только один файл:
  * ProbeUtilsImplLinux или ProbeUtilsImplWin
  * */
 
@@ -12,7 +12,7 @@ namespace info
 {
 class ProbeUtilities::ProbeUtilsImpl
 {
-public:
+  public:
     ProbeUtilsImpl();
     ~ProbeUtilsImpl();
     OSInfo getOSInfo();
@@ -26,8 +26,9 @@ public:
     std::vector<NetworkInterfaceInfo> getNetworkInterfaceInfo();
 
     CPUInfo getCPUInfo();
-private:
-    std::string _execCommand(const char* cmd) const;
+
+  private:
+    std::string _execCommand(const std::string &command) const;
 };
 
 } // namespace info
