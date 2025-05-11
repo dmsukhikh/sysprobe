@@ -21,8 +21,10 @@ void __test_DiscPartitionInfo(info::ProbeUtilities& probe)
         std::cout << "Name: " << d.name << std::endl;
         std::cout << "MountPoint: " << d.mountPoint << std::endl;
         std::cout << "Filesystem: " << d.filesystem << std::endl;
-        std::cout << "Capacity: " << d.capacity << std::endl;
-        std::cout << "FreeSpace: " << d.freeSpace << std::endl;
+        std::cout << "Capacity: " 
+                  << d.capacity / (1024 * 1024 * 1024) << " GB" << std::endl;
+        std::cout << "FreeSpace: " 
+                  << d.freeSpace / (1024 * 1024 * 1024) << " GB" << std::endl;
         std::cout << "------------------" << std::endl;
     }
 }
@@ -32,10 +34,10 @@ void __test_UserInfo(info::ProbeUtilities& probe)
     std::cout << "\n------TestUserInfo------\n";
     auto user = probe.getUserInfo()[0]; //single-user windows
     std::time_t lastLogin = std::chrono::system_clock::to_time_t(user.lastLog);
-    std::cout << "User:       " << user.name << "\n";
+    std::cout << "User:       " << user.name << std::endl;
     std::cout << "Last login: "
-              << std::put_time(std::localtime(&lastLogin), "%c") << "\n";
-    std::cout << "Uptime:     " << user.uptime.count() << " seconds\n";
+              << std::put_time(std::localtime(&lastLogin), "%c") << std::endl;
+    std::cout << "Uptime:     " << user.uptime.count() << " seconds" << std::endl;
 }
 
 void __test_CPUInfo(info::ProbeUtilities& probe)
@@ -50,8 +52,18 @@ void __test_NetworkInterfaceInfo(info::ProbeUtilities& probe)
 
 void __test_PeripheryInfo(info::ProbeUtilities& probe)
 {
-    std::cout << "\n------TestPeripheryInfo------\n";
+    std::cout << "\n------TestPeripheryInfo------\n"; 
 }
+
+void __test_MemoryInfo(info::ProbeUtilities& probe) {
+    std::cout << "\n------TestMemoryInfo------\n";
+    auto mem = probe.getMemoryInfo();
+    std::cout << "Total memory: " 
+              << mem.capacity / (1024 * 1024) << " MB" << std::endl;
+    std::cout << "Free memory:  " 
+              << mem.freeSpace / (1024 * 1024) << " MB" << std ::endl;
+}
+
 
 int main() {
     info::ProbeUtilities probe;
@@ -61,5 +73,6 @@ int main() {
     __test_NetworkInterfaceInfo(probe);
     __test_PeripheryInfo(probe);
     __test_CPUInfo(probe);
+    __test_MemoryInfo(probe);
     return 0;
 }
