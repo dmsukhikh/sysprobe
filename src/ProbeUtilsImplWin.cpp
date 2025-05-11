@@ -1,39 +1,41 @@
-#include <ProbeUtilsImplWin.hpp>
 #include <ProbeUtilities.hpp>
-#include "windows.h"
-#include <array>
-#include <chrono>
-#include <cstdio>   // for _popen and _pclose
+#include <ProbeUtilsImplWin.hpp>
 #include <iostream> // for debugging
-#include <lm.h>
-#include <memory>
 #include <sstream>
-#include <stdexcept>
+#include "windows.h"
+#include <lm.h>
 #include <string>
+#include <array>
+#include <memory>
+#include <cstdio>  // for _popen and _pclose
+#include <stdexcept>
+#include <chrono>
+
 
 using putils = info::ProbeUtilities;
-putils::ProbeUtilsImpl::ProbeUtilsImpl()
+putils::ProbeUtilsImpl::ProbeUtilsImpl() 
 {
     std::cout << "compiled for windows" << std::endl;
 }
 
 putils::ProbeUtilsImpl::~ProbeUtilsImpl() {}
 
-info::OSInfo putils::ProbeUtilsImpl::getOSInfo()
-{
+info::OSInfo putils::ProbeUtilsImpl::getOSInfo() { 
     OSInfo result;
-    result.name = _execCommand("(Get-WmiObject Win32_OperatingSystem).Caption");
-    result.hostname = _execCommand("(Get-WmiObject Win32_ComputerSystem).Name");
-    result.kernel =
-        _execCommand("(Get-WmiObject Win32_OperatingSystem).Version");
-    std::string arch_s =
-        _execCommand("(Get-WmiObject Win32_OperatingSystem).OSArchitecture");
+    result.name = _execCommand(
+        "(Get-WmiObject Win32_OperatingSystem).Caption");
+    result.hostname = _execCommand(
+        "(Get-WmiObject Win32_ComputerSystem).Name");
+    result.kernel = _execCommand(
+        "(Get-WmiObject Win32_OperatingSystem).Version");
+    std::string arch_s = _execCommand(
+        "(Get-WmiObject Win32_OperatingSystem).OSArchitecture");
 
     uint16_t arch = 0;
     if (arch_s.find("64") != std::string::npos)
     {
         arch = 64;
-    }
+    } 
     else if (arch_s.find("32") != std::string::npos)
     {
         arch = 32;
@@ -44,7 +46,7 @@ info::OSInfo putils::ProbeUtilsImpl::getOSInfo()
 
 std::vector<info::UserInfo> putils::ProbeUtilsImpl::getUserInfo()
 {
-    // используется single-user Windows
+    // используется single-user Windows 
     UserInfo user;
     user.name = _execCommand("$env:USERNAME");
 
@@ -76,15 +78,12 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
     const size_t bufferSize = 256;
     std::array<char, bufferSize> driveBuffer{};
 
-    DWORD result = GetLogicalDriveStringsA(
-        static_cast<DWORD>(driveBuffer.size()), driveBuffer.data());
-    if (result == 0 || result > driveBuffer.size())
-    {
+    DWORD result = GetLogicalDriveStringsA(static_cast<DWORD>(driveBuffer.size()), driveBuffer.data());
+    if (result == 0 || result > driveBuffer.size()) {
         return partitions;
     }
 
-    for (auto it = driveBuffer.cbegin();
-         it < driveBuffer.cend() && *it != '\0';)
+    for (auto it = driveBuffer.cbegin(); it < driveBuffer.cend() && *it != '\0'; )
     {
         std::string drive(it);
         DiscPartitionInfo disk_info;
@@ -94,15 +93,24 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
 
         // Get file system
         std::array<char, MAX_PATH> fileSystemName;
-        GetVolumeInformationA(drive.c_str(), nullptr, 0, nullptr, nullptr,
-                              nullptr, fileSystemName.data(),
-                              sizeof fileSystemName);
+        GetVolumeInformationA(
+            drive.c_str(),
+            nullptr, 
+            0, 
+            nullptr, 
+            nullptr, 
+            nullptr,
+            fileSystemName.data(), 
+            sizeof fileSystemName
+        );
         disk_info.filesystem = fileSystemName.data();
 
         ULARGE_INTEGER freeBytesAvailable, totalBytes, totalFreeBytes;
-        if (GetDiskFreeSpaceExA(drive.c_str(), &freeBytesAvailable, &totalBytes,
-                                &totalFreeBytes))
-        {
+        if (GetDiskFreeSpaceExA(
+            drive.c_str(), 
+            &freeBytesAvailable, 
+            &totalBytes,
+            &totalFreeBytes)) {
             disk_info.capacity = totalBytes.QuadPart;
             disk_info.freeSpace = totalFreeBytes.QuadPart;
         }
@@ -127,8 +135,25 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
 
 info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() { return {}; }
 
-std::string
-putils::ProbeUtilsImpl::_execCommand(const std::string &command) const
+info::MemoryInfo putils::ProbeUtilsImpl::getMemoryInfo()
+{
+    MEMORYSTATUSEX memStatus = {};
+    memStatus.dwLength = sizeof(memStatus);
+
+    MemoryInfo memInfo{};
+
+    memInfo.capacity = 0;
+    memInfo.freeSpace = 0;
+    if (GlobalMemoryStatusEx(&memStatus))
+    {
+        memInfo.capacity = memStatus.ullTotalPhys;
+        memInfo.freeSpace = memStatus.ullAvailPhys;
+    }
+
+    return memInfo;
+}
+
+std::string putils::ProbeUtilsImpl::_execCommand(const std::string& command) const
 {
     // Описание безопасности для 17 стандарта
     SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
@@ -174,8 +199,8 @@ putils::ProbeUtilsImpl::_execCommand(const std::string &command) const
     std::array<char, 256> buffer;
     DWORD bytesRead;
 
-    while (ReadFile(hReadPipe, buffer.data(), buffer.size() - 1, &bytesRead,
-                    nullptr) &&
+    while (ReadFile(hReadPipe, buffer.data(), 
+           buffer.size() - 1, &bytesRead, nullptr) &&
            bytesRead != 0)
     {
         buffer[bytesRead] = '\0';
