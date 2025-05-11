@@ -2,6 +2,7 @@
 #include <ProbeUtilities.hpp>
 #include "windows.h"
 #include <array>
+#include <chrono>
 #include <cstdio>   // for _popen and _pclose
 #include <iostream> // for debugging
 #include <lm.h>
@@ -43,7 +44,29 @@ info::OSInfo putils::ProbeUtilsImpl::getOSInfo()
 
 std::vector<info::UserInfo> putils::ProbeUtilsImpl::getUserInfo()
 {
-    return std::vector<info::UserInfo>(0);
+    // используется single-user Windows
+    UserInfo user;
+    user.name = _execCommand("$env:USERNAME");
+
+    std::string uptimeStr = _execCommand(
+        "((Get-Date) - (Get-CimInstance Win32_LogonSession | Where-Object { "
+        "$_.LogonType -eq 2 } | Sort-Object StartTime | Select-Object -First "
+        "1).StartTime).TotalSeconds");
+
+    try
+    {
+        user.uptime = std::chrono::duration<float>(std::stof(uptimeStr));
+    }
+    catch (...)
+    {
+        user.uptime = std::chrono::seconds(0);
+    }
+
+    // Последний логин = now - uptime
+    user.lastLog =
+        std::chrono::system_clock::now() -
+        std::chrono::duration_cast<std::chrono::seconds>(user.uptime);
+    return std::vector<info::UserInfo>{user};
 }
 
 std::vector<info::DiscPartitionInfo>
