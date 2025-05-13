@@ -7,9 +7,10 @@
 #include <string>
 #include <array>
 #include <memory>
-#include <cstdio>  // for _popen and _pclose
+#include <cstdio>
 #include <stdexcept>
 #include <chrono>
+#include <regex>
 
 
 using putils = info::ProbeUtilities;
@@ -124,7 +125,44 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
 
 std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
 {
-    return std::vector<info::PeripheryInfo>(0);
+    std::vector<info::PeripheryInfo> result;
+       
+    //Парсим тип и имя
+    std::regex nameRegex(R"(NAME:(.*))");
+    std::regex typeRegex(R"(TYPE:(.*))");
+
+    std::string psCommand = "$peripherals = Get-WmiObject Win32_PnPEntity; "
+                            "foreach ($device in $peripherals) { "
+                            "Write-Output ('NAME:' + $device.Name); "
+                            "Write-Output ('TYPE:' + $device.PNPDeviceID); "
+                            "}";
+    std::string output = _execCommand(psCommand);
+
+    std::string name, type;
+    std::istringstream iss(output);
+    std::string line;
+
+    while (std::getline(iss, line))
+    {
+        line.erase(line.find_last_not_of(" \r\n") + 1);
+        std::smatch match;
+
+        if (std::regex_match(line, match, nameRegex))
+        {
+            name = match[1];
+        }
+        else if (std::regex_match(line, match, typeRegex))
+        {
+            type = match[1];
+            if (!name.empty())
+            {
+                result.push_back({name, type});
+                name.clear();
+                type.clear();
+            }
+        }
+    }
+    return result;
 }
 
 std::vector<info::NetworkInterfaceInfo>
@@ -152,12 +190,11 @@ info::MemoryInfo putils::ProbeUtilsImpl::getMemoryInfo()
 
     return memInfo;
 }
-
-std::string putils::ProbeUtilsImpl::_execCommand(const std::string& command) const
+std::string putils::ProbeUtilsImpl::_execCommand(const std::string &command) const
 {
-    // Описание безопасности для 17 стандарта
+    // Создаем pipe (включены настрйки безопастности для с++17)
     SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
-    HANDLE hReadPipe, hWritePipe;
+    HANDLE hReadPipe = nullptr, hWritePipe = nullptr;
 
     if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0))
     {
@@ -167,18 +204,18 @@ std::string putils::ProbeUtilsImpl::_execCommand(const std::string& command) con
     // Настройка STARTUPINFO
     STARTUPINFOA si = {};
     si.cb = sizeof(si);
-    si.dwFlags |= STARTF_USESTDHANDLES;
+    si.dwFlags = STARTF_USESTDHANDLES;
     si.hStdOutput = hWritePipe;
     si.hStdError = hWritePipe;
 
     PROCESS_INFORMATION pi = {};
 
     std::string fullCommand = "powershell -Command \"" + command + "\"";
-    char cmdLine[MAX_PATH * 4];
-    strncpy(cmdLine, fullCommand.c_str(), sizeof(cmdLine) - 1);
+    std::vector<char> cmdLine(fullCommand.cbegin(), fullCommand.cend());
+    cmdLine.push_back('\0');
 
     BOOL success =
-        CreateProcessA(nullptr, cmdLine, nullptr, nullptr,
+        CreateProcessA(nullptr, cmdLine.data(), nullptr, nullptr,
                        TRUE,             // Наследование дескрипторов
                        CREATE_NO_WINDOW, // Не показывать окно консоли
                        nullptr, nullptr,
@@ -186,21 +223,23 @@ std::string putils::ProbeUtilsImpl::_execCommand(const std::string& command) con
                        &pi  // PROCESS_INFORMATION
         );
 
+    // Закрываем дескриптор записи у родителя (хз, может течь походу)
     CloseHandle(hWritePipe);
 
     if (!success)
     {
+        // Закрываем дескриптор чтения у родителя
         CloseHandle(hReadPipe);
         return "Error: Failed to create process";
     }
 
     // Чтение результата из pipe
     std::ostringstream output;
-    std::array<char, 256> buffer;
+    std::array<char, 512> buffer;
     DWORD bytesRead;
 
-    while (ReadFile(hReadPipe, buffer.data(), 
-           buffer.size() - 1, &bytesRead, nullptr) &&
+    while (ReadFile(hReadPipe, buffer.data(), buffer.size() - 1, &bytesRead,
+                    nullptr) &&
            bytesRead != 0)
     {
         buffer[bytesRead] = '\0';
