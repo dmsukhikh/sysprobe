@@ -47,7 +47,7 @@ info::OSInfo putils::ProbeUtilsImpl::getOSInfo() {
 
 std::vector<info::UserInfo> putils::ProbeUtilsImpl::getUserInfo()
 {
-    // используется single-user Windows 
+    // РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ single-user Windows 
     UserInfo user;
     user.name = _execCommand("$env:USERNAME");
 
@@ -65,7 +65,7 @@ std::vector<info::UserInfo> putils::ProbeUtilsImpl::getUserInfo()
         user.uptime = std::chrono::seconds(0);
     }
 
-    // Последний логин = now - uptime
+    // РџРѕСЃР»РµРґРЅРёР№ Р»РѕРіРёРЅ = now - uptime
     user.lastLog =
         std::chrono::system_clock::now() -
         std::chrono::duration_cast<std::chrono::seconds>(user.uptime);
@@ -127,7 +127,7 @@ std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
 {
     std::vector<info::PeripheryInfo> result;
        
-    //Парсим тип и имя
+    //РџР°СЂСЃРёРј С‚РёРї Рё РёРјСЏ
     std::regex nameRegex(R"(NAME:(.*))");
     std::regex typeRegex(R"(TYPE:(.*))");
 
@@ -171,7 +171,38 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
     return std::vector<info::NetworkInterfaceInfo>(0);
 }
 
-info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() { return {}; }
+info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() { 
+        std::unordered_map<int, std::string> archs = {
+        {0, "x86"}, {1, "MIPS"},    {2, "Alpha"}, {3, "PowerPC"},
+        {4, "ARM"}, {5, "Itanium"}, {6, "ia64"},  {9, "x64"},
+    };
+
+    info::CPUInfo info{};
+    std::string WMI = "(Get-WmiObject Win32_Processor).";
+        
+    info.name = _execCommand(WMI + "Name");
+    int arch = std::stoi(_execCommand(WMI + "Architecture"));
+    if (archs.count(arch))
+    {
+        info.arch = archs[arch];
+    }
+    else
+    {
+        info.arch = "Undefine";
+    }
+    info.l1_cache = 0; // Wmi РїРѕРјРµС‚РёР» L1CacheSize РєР°Рє not implemented
+    info.l2_cache =
+        static_cast<uint32_t>(std::stoi(_execCommand(WMI + "L2CacheSize")));
+    info.l3_cache =
+        static_cast<uint32_t>(std::stoi(_execCommand(WMI + "L3CacheSize")));
+    // ProcessorId - hex СЃС‚СЂРѕРєР°
+    info.overall_cache = info.l1_cache + info.l2_cache + info.l3_cache;
+    info.physid = static_cast<uint64_t>(std::stoull(
+        _execCommand(WMI + "ProcessorId"), nullptr, 16));
+    info.clockFreq = std::stof(_execCommand(WMI + "CurrentClockSpeed"));
+
+    return info; 
+}
 
 info::MemoryInfo putils::ProbeUtilsImpl::getMemoryInfo()
 {
@@ -192,7 +223,7 @@ info::MemoryInfo putils::ProbeUtilsImpl::getMemoryInfo()
 }
 std::string putils::ProbeUtilsImpl::_execCommand(const std::string &command) const
 {
-    // Создаем pipe (включены настрйки безопастности для с++17)
+    // РЎРѕР·РґР°РµРј pipe (РІРєР»СЋС‡РµРЅС‹ РЅР°СЃС‚СЂРѕР№РєРё Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё РґР»СЏ СЃ++17)
     SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
     HANDLE hReadPipe = nullptr, hWritePipe = nullptr;
 
@@ -201,7 +232,7 @@ std::string putils::ProbeUtilsImpl::_execCommand(const std::string &command) con
         return "Error: Failed to create pipe";
     }
 
-    // Настройка STARTUPINFO
+    // РќР°СЃС‚СЂРѕР№РєР° STARTUPINFO
     STARTUPINFOA si = {};
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESTDHANDLES;
@@ -216,24 +247,24 @@ std::string putils::ProbeUtilsImpl::_execCommand(const std::string &command) con
 
     BOOL success =
         CreateProcessA(nullptr, cmdLine.data(), nullptr, nullptr,
-                       TRUE,             // Наследование дескрипторов
-                       CREATE_NO_WINDOW, // Не показывать окно консоли
+                       TRUE,             // РќР°СЃР»РµРґРѕРІР°РЅРёРµ РґРµСЃРєСЂРёРїС‚РѕСЂРѕРІ
+                       CREATE_NO_WINDOW, // РќРµ РїРѕРєР°Р·С‹РІР°С‚СЊ РѕРєРЅРѕ РєРѕРЅСЃРѕР»Рё
                        nullptr, nullptr,
                        &si, // STARTUPINFO
                        &pi  // PROCESS_INFORMATION
         );
 
-    // Закрываем дескриптор записи у родителя (хз, может течь походу)
+    // Р—Р°РєСЂС‹РІР°РµРј РґРµСЃРєСЂРёРїС‚РѕСЂ Р·Р°РїРёСЃРё Сѓ СЂРѕРґРёС‚РµР»СЏ (С…Р·, РјРѕР¶РµС‚ С‚РµС‡СЊ РїРѕС…РѕРґСѓ)
     CloseHandle(hWritePipe);
 
     if (!success)
     {
-        // Закрываем дескриптор чтения у родителя
+        // Р—Р°РєСЂС‹РІР°РµРј РґРµСЃРєСЂРёРїС‚РѕСЂ С‡С‚РµРЅРёСЏ Сѓ СЂРѕРґРёС‚РµР»СЏ
         CloseHandle(hReadPipe);
         return "Error: Failed to create process";
     }
 
-    // Чтение результата из pipe
+    // Р§С‚РµРЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚Р° РёР· pipe
     std::ostringstream output;
     std::array<char, 512> buffer;
     DWORD bytesRead;
@@ -246,7 +277,7 @@ std::string putils::ProbeUtilsImpl::_execCommand(const std::string &command) con
         output << buffer.data();
     }
 
-    // Закрытие всех дескрипторов
+    // Р—Р°РєСЂС‹С‚РёРµ РІСЃРµС… РґРµСЃРєСЂРёРїС‚РѕСЂРѕРІ
     CloseHandle(hReadPipe);
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
