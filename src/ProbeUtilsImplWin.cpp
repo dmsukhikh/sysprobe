@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <chrono>
 #include <regex>
+#include <cctype>
 
 
 using putils = info::ProbeUtilities;
@@ -23,14 +24,19 @@ putils::ProbeUtilsImpl::~ProbeUtilsImpl() {}
 
 info::OSInfo putils::ProbeUtilsImpl::getOSInfo() { 
     OSInfo result;
-    result.name = _execCommand(
-        "(Get-WmiObject Win32_OperatingSystem).Caption");
-    result.hostname = _execCommand(
-        "(Get-WmiObject Win32_ComputerSystem).Name");
-    result.kernel = _execCommand(
-        "(Get-WmiObject Win32_OperatingSystem).Version");
-    std::string arch_s = _execCommand(
-        "(Get-WmiObject Win32_OperatingSystem).OSArchitecture");
+    std::string psCommand = "$os = Get-WmiObject Win32_OperatingSystem;"
+                            "$os.Caption;"
+                            "$string = $os.Name;"
+                            "$index = $string.IndexOf('|');"
+                            "$string.Substring($index + 1);"
+                            "$os.Version;"
+                            "$os.OSArchitecture;";
+    std::istringstream WMI(_execCommand(psCommand));
+    std::getline(WMI, result.name);
+    std::getline(WMI, result.hostname);
+    std::getline(WMI, result.kernel);
+    std::string arch_s;
+    std::getline(WMI, arch_s);
 
     uint16_t arch = 0;
     if (arch_s.find("64") != std::string::npos)
@@ -51,14 +57,14 @@ std::vector<info::UserInfo> putils::ProbeUtilsImpl::getUserInfo()
     UserInfo user;
     user.name = _execCommand("$env:USERNAME");
 
-    std::string uptimeStr = _execCommand(
+    std::string psCommand = _execCommand(
         "((Get-Date) - (Get-CimInstance Win32_LogonSession | Where-Object { "
         "$_.LogonType -eq 2 } | Sort-Object StartTime | Select-Object -First "
         "1).StartTime).TotalSeconds");
 
     try
     {
-        user.uptime = std::chrono::duration<float>(std::stof(uptimeStr));
+        user.uptime = std::chrono::duration<float>(std::stof(psCommand));
     }
     catch (...)
     {
@@ -151,9 +157,13 @@ std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
         {
             name = match[1];
         }
-        else if (std::regex_match(line, match, typeRegex))
-        {
+        else if (std::regex_match(line, match, typeRegex)){
             type = match[1];
+            size_t pos = type.find('\\');
+            if (pos != std::string::npos && std::isalpha(type[0])) {
+                type = type.substr(0, pos);
+            }
+
             if (!name.empty())
             {
                 result.push_back({name, type});
@@ -168,20 +178,83 @@ std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
 std::vector<info::NetworkInterfaceInfo>
 putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
 {
-    return std::vector<info::NetworkInterfaceInfo>(0);
+    std::vector<info::NetworkInterfaceInfo> result;
+    // Берем сетевые адаптеры, для которых включена IP-конфигурация.
+    std::string psCommand = "$netAdap = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object{$_.IPEnabled}; "
+                            "foreach ($obj in $netAdap){ "
+                            "$obj.Description; "
+                            "$obj.MACAddress; "
+                            "$obj.IPAddress; " 
+                            "$obj.IPSubnet; "
+                            "}";
+    std::string line;
+    std::istringstream iss{_execCommand(psCommand)};
+    int k = 0;
+    info::NetworkInterfaceInfo netInfo;
+
+    auto countOnes = [](const std::array<uint8_t, 4> &arr)
+    {
+        uint32_t num = (static_cast<uint32_t>(arr[0]) << 24) |
+                       (static_cast<uint32_t>(arr[1]) << 16) |
+                       (static_cast<uint32_t>(arr[2]) << 8) |
+                       (static_cast<uint32_t>(arr[3]));
+
+        std::bitset<32> bits(num);
+        return bits.count();
+    };
+
+    while (std::getline(iss, line))
+    {
+        line.erase(line.find_last_not_of(" \r\n") + 1);
+        if (k == 0)
+            netInfo.name = line;
+        else if (k == 1)
+            netInfo.mac = _splitLine<6>(line, ':', 16);
+        else if (k == 2)
+            netInfo.ipv4 = _splitLine<4>(line, '.', 10);
+        else if (k == 3)
+            netInfo.ipv6 = _splitIPv6(line);
+        else if (k == 4)
+            netInfo.ipv4_mask = countOnes(_splitLine<4>(line, '.', 10));
+        else
+        { 
+            netInfo.ipv6_mask = static_cast<uint8_t>(std::stoi(line));
+            k = -1;
+            result.push_back(netInfo);
+            netInfo = info::NetworkInterfaceInfo{};
+        }
+        k++;
+    }
+    
+    return result;
 }
 
 info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() { 
-        std::unordered_map<int, std::string> archs = {
+    std::unordered_map<int, std::string> archs = {
         {0, "x86"}, {1, "MIPS"},    {2, "Alpha"}, {3, "PowerPC"},
         {4, "ARM"}, {5, "Itanium"}, {6, "ia64"},  {9, "x64"},
     };
 
+
     info::CPUInfo info{};
-    std::string WMI = "(Get-WmiObject Win32_Processor).";
+    std::string psCommand = "$cpu = Get-WmiObject Win32_Processor;"
+                            "foreach ($processor in $cpu) {"
+                            "$processor.Name;"
+                            "$processor.Architecture;"
+                            "$processor.NumberOfCores;"
+                            "$processor.L1CacheSize;"
+                            "$processor.L2CacheSize;"
+                            "$processor.L3CacheSize;"
+                            "$processor.ProcessorId;"
+                            "$processor.CurrentClockSpeed;"
+                            "}";
+    std::istringstream WMI(_execCommand(psCommand));
+    std::string line;
         
-    info.name = _execCommand(WMI + "Name");
-    int arch = std::stoi(_execCommand(WMI + "Architecture"));
+    std::getline(WMI, info.name);
+
+    std::getline(WMI, line);
+    int arch = std::stoi(line);
     if (archs.count(arch))
     {
         info.arch = archs[arch];
@@ -190,18 +263,29 @@ info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() {
     {
         info.arch = "Undefine";
     }
-    info.l1_cache = 0; // Wmi пометил L1CacheSize как not implemented
-    info.l2_cache =
-        static_cast<uint32_t>(std::stoi(_execCommand(WMI + "L2CacheSize")));
-    info.l3_cache =
-        static_cast<uint32_t>(std::stoi(_execCommand(WMI + "L3CacheSize")));
-    // ProcessorId - hex строка
-    info.overall_cache = info.l1_cache + info.l2_cache + info.l3_cache;
-    info.physid = static_cast<uint64_t>(std::stoull(
-        _execCommand(WMI + "ProcessorId"), nullptr, 16));
-    info.clockFreq = std::stof(_execCommand(WMI + "CurrentClockSpeed"));
 
-    return info; 
+    std::getline(WMI, line);
+    info.cores = static_cast<uint8_t>(std::stoi(line));
+
+    info.l1_cache = 0; // Wmi пометил L1CacheSize как not implemented
+    std::getline(WMI, line);
+    info.l2_cache =
+        static_cast<uint32_t>(std::stoi(line));
+
+    std::getline(WMI, line);
+    info.l3_cache =
+        static_cast<uint32_t>(std::stoi(line));
+
+    info.overall_cache = info.l1_cache + info.l2_cache + info.l3_cache;
+    // ProcessorId - hex строка
+    std::getline(WMI, line);
+    info.physid = static_cast<uint64_t>(std::stoull(
+        line, nullptr, 16));
+
+    std::getline(WMI, line);
+    info.clockFreq = std::stof(line);
+
+    return info;
 }
 
 info::MemoryInfo putils::ProbeUtilsImpl::getMemoryInfo()
@@ -221,9 +305,9 @@ info::MemoryInfo putils::ProbeUtilsImpl::getMemoryInfo()
 
     return memInfo;
 }
-std::string putils::ProbeUtilsImpl::_execCommand(const std::string &command) const
+std::string putils::ProbeUtilsImpl::_execCommand(const std::string &command)
 {
-    // Создаем pipe (включены настройки безопасности для с++17)
+    // Создаем pipe (включены настрйки безопастности для с++17)
     SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
     HANDLE hReadPipe = nullptr, hWritePipe = nullptr;
 
@@ -284,5 +368,88 @@ std::string putils::ProbeUtilsImpl::_execCommand(const std::string &command) con
 
     std::string result = output.str();
     result.erase(result.find_last_not_of(" \n\r\t") + 1);
+    return result;
+}
+
+template <size_t N>
+std::array<uint8_t, N> 
+putils::ProbeUtilsImpl::_splitLine(const std::string &mac,
+                                  char delimiter, int base)
+{
+    std::istringstream iss(mac);
+    std::array<uint8_t, N> tokens{};
+    std::string token;
+    size_t i = 0;
+
+    while (std::getline(iss, token, delimiter) && i < N)
+    {
+        try
+        {
+            tokens[i] = static_cast<uint8_t>(std::stoi(token, nullptr, base));
+        }
+        catch (const std::invalid_argument& e)
+        {
+            tokens[i] = 0;
+        }
+        i++;
+    }
+
+    return tokens;
+}
+
+std::array<uint8_t, 16>
+putils::ProbeUtilsImpl::_splitIPv6(const std::string &ipv6)
+{
+    std::array<uint8_t, 16> result{};
+    std::vector<std::string> segments;
+
+    size_t zeros = ipv6.find("::");
+    if (zeros != std::string::npos)
+    {
+        std::string left = ipv6.substr(0, zeros);
+        std::string right = ipv6.substr(zeros + 2);
+
+        std::istringstream lss(left), rss(right);
+        std::string token;
+
+        while (std::getline(lss, token, ':'))
+        {
+            if (!token.empty())
+                segments.push_back(token);
+        }
+
+        std::vector<std::string> right_segments;
+        while (std::getline(rss, token, ':'))
+        {
+            if (!token.empty())
+                right_segments.push_back(token);
+        }
+
+        size_t fill_zeros = 8 - (segments.size() + right_segments.size());
+        segments.resize(segments.size() + fill_zeros, "0");
+        segments.insert(segments.end(), right_segments.begin(),
+                        right_segments.end());
+    }
+    else
+    {
+        std::istringstream iss(ipv6);
+        std::string token;
+        while (std::getline(iss, token, ':'))
+        {
+            segments.push_back(token.empty() ? "0" : token);
+        }
+    }
+
+    // Разбиваем каждое 16-битное слово на 2 байта (big-endian)
+    size_t idx = 0;
+    for (const auto &seg : segments)
+    {
+        if (idx + 1 >= result.size())
+            break;
+        uint16_t val = static_cast<uint16_t>(std::stoi(seg, nullptr, 16));
+        result[idx++] = static_cast<uint8_t>((val >> 8) & 0xFF); // старший байт
+        result[idx++] = static_cast<uint8_t>(val & 0xFF);        // младший байт
+    }
+
     return result;
 }
