@@ -12,6 +12,8 @@
 #include <chrono>
 #include <regex>
 #include <cctype>
+#include <bitset>
+#include <unordered_map>
 
 
 using putils = info::ProbeUtilities;
@@ -90,42 +92,41 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
         return partitions;
     }
 
-    for (auto it = driveBuffer.cbegin(); it < driveBuffer.cend() && *it != '\0'; )
-    {
-        std::string drive(it);
-        DiscPartitionInfo disk_info;
+    for (auto it = driveBuffer.cbegin(); it != driveBuffer.cend() && *it != '\0'; ) {
+    // Создаем строку до следующего '\0'
+    auto end_it = std::find(it, driveBuffer.cend(), '\0');
+    std::string drive(it, end_it);
 
-        disk_info.mountPoint = drive;
-        disk_info.name = drive;
+    DiscPartitionInfo disk_info;
+    disk_info.mountPoint = drive;
+    disk_info.name = drive;
 
-        // Get file system
-        std::array<char, MAX_PATH> fileSystemName;
-        GetVolumeInformationA(
-            drive.c_str(),
-            nullptr, 
-            0, 
-            nullptr, 
-            nullptr, 
-            nullptr,
-            fileSystemName.data(), 
-            sizeof fileSystemName
-        );
+    // Получаем информацию о файловой системе
+    std::array<char, MAX_PATH> fileSystemName = {0};
+    if (GetVolumeInformationA(
+        drive.c_str(),
+        nullptr, 0, nullptr, nullptr, nullptr,
+        fileSystemName.data(), fileSystemName.size())) {
         disk_info.filesystem = fileSystemName.data();
-
-        ULARGE_INTEGER freeBytesAvailable, totalBytes, totalFreeBytes;
-        if (GetDiskFreeSpaceExA(
-            drive.c_str(), 
-            &freeBytesAvailable, 
-            &totalBytes,
-            &totalFreeBytes)) {
-            disk_info.capacity = totalBytes.QuadPart;
-            disk_info.freeSpace = totalFreeBytes.QuadPart;
-        }
-
-        partitions.push_back(disk_info);
-        it += drive.size() + 1;
     }
 
+    // Получаем информацию о свободном месте
+    ULARGE_INTEGER freeBytesAvailable, totalBytes, totalFreeBytes;
+    if (GetDiskFreeSpaceExA(
+        drive.c_str(), 
+        &freeBytesAvailable, 
+        &totalBytes,
+        &totalFreeBytes)) {
+        disk_info.capacity = totalBytes.QuadPart;
+        disk_info.freeSpace = totalFreeBytes.QuadPart;
+    }
+
+    partitions.push_back(disk_info);
+
+    // Переходим к следующей строке (пропускаем '\0')
+    it = end_it;
+    if (it != driveBuffer.cend()) ++it;
+}
     return partitions;
 }
 
@@ -205,7 +206,10 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
 
     while (std::getline(iss, line))
     {
-        line.erase(line.find_last_not_of(" \r\n") + 1);
+        auto end_pos = line.find_last_not_of(" \r\n");
+if (end_pos != std::string::npos) {
+    line.erase(end_pos + 1);
+}
         if (k == 0)
             netInfo.name = line;
         else if (k == 1)
@@ -218,7 +222,20 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
             netInfo.ipv4_mask = countOnes(_splitLine<4>(line, '.', 10));
         else
         { 
-            netInfo.ipv6_mask = static_cast<uint8_t>(std::stoi(line));
+            try {
+    int mask = std::stoi(line);
+    if (mask < 0 || mask > 128) {
+        // Обработка ошибки: неверная маска IPv6
+        mask = 128; // или другое значение по умолчанию / выбросить исключение
+    }
+    netInfo.ipv6_mask = static_cast<uint8_t>(mask);
+} catch (const std::invalid_argument&) {
+    // Обработка случая, когда line не число
+    netInfo.ipv6_mask = 128; // или другое значение по умолчанию
+} catch (const std::out_of_range&) {
+    // Обработка переполнения
+    netInfo.ipv6_mask = 128; // или другое значение по умолчанию
+}
             k = -1;
             result.push_back(netInfo);
             netInfo = info::NetworkInterfaceInfo{};
