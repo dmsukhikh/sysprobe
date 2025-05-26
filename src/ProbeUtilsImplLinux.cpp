@@ -14,6 +14,25 @@
 #include <unistd.h>
 #include <utmp.h>
 
+/**
+ * @brief RAII-based обертка над ifstream
+ */
+class ifstreamWrapper
+{
+    std::ifstream _s;  ///< Файл
+    std::string _name; ///< Название файла
+  public:
+    ifstreamWrapper(std::string name) : _s(name), _name(name) {}
+
+    std::ifstream &getStream() { return _s; }
+
+    ~ifstreamWrapper()
+    {
+        std::string rmstr = "rm " + _name;
+        std::system(rmstr.c_str());
+    }
+};
+
 using putils = info::ProbeUtilities;
 using namespace nlohmann;
 using namespace std::chrono_literals;
@@ -83,8 +102,9 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
         std::system(
             "lsblk --output NAME,MOUNTPOINT,FSTYPE,SIZE,FSAVAIL,FSUSED,TYPE "
             "--json --bytes > dpinfo.json");
-        std::ifstream dpinfo("dpinfo.json");
-        json dpinfoParsed = json::parse(dpinfo);
+
+        ifstreamWrapper dpinfo("dpinfo.json");
+        json dpinfoParsed = json::parse(dpinfo.getStream());
 
         auto &output = _cached_DPInfo.value();
 
@@ -108,9 +128,6 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
                 output.push_back(infoToPush);
             }
         }
-
-        dpinfo.close();
-        std::system("rm dpinfo.json");
     }
 
     return _cached_DPInfo.value();
@@ -122,7 +139,7 @@ std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
     // в рантаймe
 
     std::system("lshw -json > perinfo.json");
-    std::ifstream rawPerInfo("perinfo.json");
+    ifstreamWrapper rawPerInfo("perinfo.json");
 
     // Реализуем DFS для мощного обхода json'a
     std::vector<PeripheryInfo> output;
@@ -153,10 +170,7 @@ std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
         }
     };
 
-    traverse(json::parse(rawPerInfo));
-    rawPerInfo.close();
-    std::system("rm perinfo.json");
-
+    traverse(json::parse(rawPerInfo.getStream()));
     return output;
 }
 
@@ -164,10 +178,10 @@ std::vector<info::NetworkInterfaceInfo>
 putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
 {
     std::system("ip -j addr show > netinfo.json");
-    std::ifstream rawNInfo("netinfo.json");
+    ifstreamWrapper rawNInfo("netinfo.json");
 
     std::vector<NetworkInterfaceInfo> output;
-    for (const auto &interface : json::parse(rawNInfo))
+    for (const auto &interface : json::parse(rawNInfo.getStream()))
     {
         NetworkInterfaceInfo curIF;
         // Такое се, нужно поменять интерфейс
@@ -225,9 +239,6 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
         output.push_back(curIF);
     }
 
-    rawNInfo.close();
-    std::system("rm netinfo.json");
-
     return output;
 }
 
@@ -253,9 +264,9 @@ void putils::ProbeUtilsImpl::_getCPULoadness(CPUInfo &output)
     {
         std::vector<std::pair<uint64_t, uint64_t>> output;
         std::system("cat /proc/stat | grep \"cpu\" > loadinfo.txt");
-        std::ifstream st("loadinfo.txt");
+        ifstreamWrapper st("loadinfo.txt");
 
-        for (std::string line, stub; getline(st, line);)
+        for (std::string line, stub; getline(st.getStream(), line);)
         {
             std::stringstream parsedLine(line);
             parsedLine >> stub;
@@ -274,7 +285,6 @@ void putils::ProbeUtilsImpl::_getCPULoadness(CPUInfo &output)
             output.emplace_back(useful, all);
         }
 
-        std::system("rm loadinfo.txt");
         return output;
     };
 
@@ -294,8 +304,8 @@ void putils::ProbeUtilsImpl::_getCPUCache(CPUInfo &output)
 {
     // Получаем емкость кэшей
     std::system("lscpu -C --json --bytes > cpuinfo.json");
-    std::ifstream cacheInfoRaw("cpuinfo.json");
-    auto cacheInfo = json::parse(cacheInfoRaw);
+    ifstreamWrapper cacheInfoRaw("cpuinfo.json");
+    auto cacheInfo = json::parse(cacheInfoRaw.getStream());
 
     for (const auto &entry :
          cacheInfo.value("caches", nlohmann::basic_json<>{}))
@@ -318,8 +328,6 @@ void putils::ProbeUtilsImpl::_getCPUCache(CPUInfo &output)
             output.l3_cache = capacity;
         }
     }
-
-    std::system("rm cpuinfo.json");
 }
 
 void putils::ProbeUtilsImpl::_getCPUBasicInfo(CPUInfo &output)
