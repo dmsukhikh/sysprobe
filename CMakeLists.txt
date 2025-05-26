@@ -1,14 +1,13 @@
 cmake_minimum_required(VERSION 3.5)
 project('sysprobe')
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_STANDART 17)
+set(CMAKE_CXX_STANDARD 17)
 
 # Вид сборки: Debug или Release
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Debug" FORCE)
 endif()
 
-set(COMPILE_FLAGS -std=c++17)
 # Флаги компиляции для дебаг-сборки
 if (CMAKE_BUILD_TYPE STREQUAL Debug)
     list(APPEND COMPILE_FLAGS -Wall -Wextra -Wpedantic 
