@@ -32,11 +32,9 @@ add_library(probe_utilities STATIC ${CMAKE_SOURCE_DIR}/src/ProbeUtilities.cpp)
 if (WIN32)
     target_sources(probe_utilities PUBLIC 
                   ${CMAKE_SOURCE_DIR}/src/ProbeUtilsImplWin.cpp)
-    target_compile_definitions(probe_utilities PRIVATE TARGET_SYSTEM=0)
 elseif(UNIX)
     target_sources(probe_utilities PUBLIC 
                   ${CMAKE_SOURCE_DIR}/src/ProbeUtilsImplLinux.cpp)
-    target_compile_definitions(probe_utilities PRIVATE TARGET_SYSTEM=1)
 else()
     message(FATAL_ERROR "Your platform isn't valid\n"
                         "List of supported platforms: \'Linux\', \'Windows\'")
