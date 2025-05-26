@@ -2,12 +2,12 @@
 #define __PROBE_UTILITIES
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <memory>
-#include <string>
-#include <chrono>
-#include <vector>
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace info
 {
@@ -16,10 +16,10 @@ namespace info
  */
 struct OSInfo
 {
-    std::string name; ///< Название операционной системы
+    std::string name;     ///< Название операционной системы
     std::string hostname; ///< Название машины-хоста
-    std::string kernel; ///< Название ядра операционной системы
-    uint16_t arch; ///< Разрядность операционной системы
+    std::string kernel;   ///< Название ядра операционной системы
+    uint16_t arch;        ///< Разрядность операционной системы
 };
 
 /**
@@ -29,10 +29,10 @@ struct UserInfo
 {
     std::string name; ///< Имя пользователя
     /**
-     * @brief Когда пользователь вошел в систему 
+     * @brief Когда пользователь вошел в систему
      *
-     * @details Момент времени, когда пользователь вошел в систему, в секундах от
-     * начала эпохи
+     * @details Момент времени, когда пользователь вошел в систему, в секундах
+     * от начала эпохи
      */
     std::chrono::time_point<std::chrono::system_clock> lastLog;
     std::chrono::duration<float>
@@ -44,11 +44,11 @@ struct UserInfo
  */
 struct DiscPartitionInfo
 {
-    std::string name; ///< Название раздела
+    std::string name;       ///< Название раздела
     std::string mountPoint; ///< Точка монтирования раздела в системе
     std::string filesystem; ///< Тип файловой системы раздела
 
-    uint64_t capacity; ///< Емкость раздела, в байтах
+    uint64_t capacity;  ///< Емкость раздела, в байтах
     uint64_t freeSpace; ///< Емкость раздела, в байтах
 };
 
@@ -64,7 +64,7 @@ struct PeripheryInfo
      * @note Тип устройства зависит от системы: типы на Windows не совпадают с
      * типами на Linux
      */
-    std::string type; 
+    std::string type;
 };
 
 /**
@@ -143,7 +143,7 @@ struct CPUInfo
  */
 struct MemoryInfo
 {
-    uint64_t capacity; ///< Общая емкость ОЗУ, в байтах
+    uint64_t capacity;  ///< Общая емкость ОЗУ, в байтах
     uint64_t freeSpace; ///< Доступное пространство ОЗУ, в байтах
 };
 
@@ -202,10 +202,10 @@ class ProbeUtilities
     std::vector<PeripheryInfo> getPeripheryInfo();
 
     /**
-     * @brief Получение информации о всех сетевых устройствах 
+     * @brief Получение информации о всех сетевых устройствах
      *
      * @return Массив структур NetworkInterfaceInfo. Каждая структура описывает
-     * отдельный сетевой интерфейс 
+     * отдельный сетевой интерфейс
      */
     std::vector<NetworkInterfaceInfo> getNetworkInterfaceInfo();
 

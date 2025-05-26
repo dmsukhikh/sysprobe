@@ -1,9 +1,8 @@
 #include "ProbeUtilities.hpp"
-#include <ctime>
 #include <chrono>
+#include <ctime>
 #include <iostream>
 #include <sstream>
-
 
 /*
  *
@@ -11,7 +10,7 @@
  *
  */
 
-void __test_OSInfo(info::ProbeUtilities& probe) 
+void __test_OSInfo(info::ProbeUtilities &probe)
 {
     std::cout << "\n------TestOSInfo------\n";
     info::OSInfo result = probe.getOSInfo();
@@ -21,11 +20,12 @@ void __test_OSInfo(info::ProbeUtilities& probe)
     std::cout << "Arch: " << result.arch << std::endl;
 }
 
-void __test_DiscPartitionInfo(info::ProbeUtilities& probe) 
+void __test_DiscPartitionInfo(info::ProbeUtilities &probe)
 {
     std::cout << "\n------TestDiscPartitionInfo------\n";
     std::vector<info::DiscPartitionInfo> result = probe.getDiscPartitionInfo();
-    for (const auto& d: result) {
+    for (const auto &d : result)
+    {
         std::cout << "Name: " << d.name << std::endl;
         std::cout << "MountPoint: " << d.mountPoint << std::endl;
         std::cout << "Filesystem: " << d.filesystem << std::endl;
@@ -35,25 +35,25 @@ void __test_DiscPartitionInfo(info::ProbeUtilities& probe)
     }
 }
 
-void __test_UserInfo(info::ProbeUtilities& probe)
+void __test_UserInfo(info::ProbeUtilities &probe)
 {
     std::cout << "\n------TestUserInfo------\n";
     auto result = probe.getUserInfo();
-    for (const auto& d: result) {
+    for (const auto &d : result)
+    {
         std::cout << "Name: " << d.name << std::endl;
         std::time_t epoch_time =
             std::chrono::system_clock::to_time_t(d.lastLog);
         std::cout << "Last log time: " << std::ctime(&epoch_time);
-        std::cout
-            << "Uptime: "
-            << std::chrono::duration_cast<std::chrono::minutes>(d.uptime).count()
-            << " minutes"
-            << std::endl;
+        std::cout << "Uptime: "
+                  << std::chrono::duration_cast<std::chrono::minutes>(d.uptime)
+                         .count()
+                  << " minutes" << std::endl;
         std::cout << std::endl;
     }
 }
 
-void __test_CPUInfo(info::ProbeUtilities& probe)
+void __test_CPUInfo(info::ProbeUtilities &probe)
 {
     std::cout << "\n------TestCPUInfo------\n";
     auto info = probe.getCPUInfo();
@@ -76,7 +76,7 @@ void __test_CPUInfo(info::ProbeUtilities& probe)
     }
 }
 
-void __test_NetworkInterfaceInfo(info::ProbeUtilities& probe)
+void __test_NetworkInterfaceInfo(info::ProbeUtilities &probe)
 {
     std::cout << "\n------TestNetworkInterfaceInfo------\n";
     auto users = probe.getNetworkInterfaceInfo();
@@ -91,14 +91,14 @@ void __test_NetworkInterfaceInfo(info::ProbeUtilities& probe)
         s.str("");
     };
 
-    for (auto &part: users)
+    for (auto &part : users)
     {
         std::cout << "Name: " << part.name << std::endl;
         std::stringstream fs;
         if (part.mac)
         {
             std::cout << "MAC: ";
-            for (auto i: part.mac.value())
+            for (auto i : part.mac.value())
             {
                 fs << std::hex << (int)i << ":";
             }
@@ -134,11 +134,11 @@ void __test_NetworkInterfaceInfo(info::ProbeUtilities& probe)
     }
 }
 
-void __test_PeripheryInfo(info::ProbeUtilities& probe)
+void __test_PeripheryInfo(info::ProbeUtilities &probe)
 {
     std::cout << "\n------TestPeripheryInfo------\n";
     auto info = probe.getPeripheryInfo();
-    for (const auto &i: info)
+    for (const auto &i : info)
     {
         std::cout << "Name: " << i.name << std::endl;
         std::cout << "Type: " << i.type << std::endl;
@@ -146,7 +146,7 @@ void __test_PeripheryInfo(info::ProbeUtilities& probe)
     }
 }
 
-void __test_MemoryInfo(info::ProbeUtilities& probe)
+void __test_MemoryInfo(info::ProbeUtilities &probe)
 {
     std::cout << "\n------TestMemoryInfo------\n";
     auto info = probe.getMemoryInfo();
@@ -157,7 +157,8 @@ void __test_MemoryInfo(info::ProbeUtilities& probe)
               << std::endl;
 }
 
-int main() {
+int main()
+{
     info::ProbeUtilities probe;
     __test_OSInfo(probe);
     __test_UserInfo(probe);

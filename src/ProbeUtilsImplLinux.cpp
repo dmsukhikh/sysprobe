@@ -1,20 +1,18 @@
 #include <ProbeUtilities.hpp>
 #include <ProbeUtilsImplLinux.hpp>
+#include <arpa/inet.h>
+#include <chrono>
 #include <cstdint>
+#include <cstdlib>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <netinet/in.h>
+#include <nlohmann/json.hpp>
 #include <sys/utsname.h>
 #include <thread>
-#include <utmp.h>
-#include <chrono>
-#include <fstream>
-#include <nlohmann/json.hpp>
-#include <cstdlib>
-#include <arpa/inet.h>
 #include <unistd.h>
-
-
+#include <utmp.h>
 
 using putils = info::ProbeUtilities;
 using namespace nlohmann;
@@ -23,14 +21,12 @@ using namespace std::chrono_literals;
 const std::unordered_set<std::string> putils::ProbeUtilsImpl::_DESIRED_CLASSES =
     {"multimedia", "communication", "printer", "input", "display"};
 
-putils::ProbeUtilsImpl::ProbeUtilsImpl() 
-{
-}
+putils::ProbeUtilsImpl::ProbeUtilsImpl() {}
 
 putils::ProbeUtilsImpl::~ProbeUtilsImpl() {}
 
-info::OSInfo putils::ProbeUtilsImpl::getOSInfo() 
-{  
+info::OSInfo putils::ProbeUtilsImpl::getOSInfo()
+{
     if (!_osinfo.has_value())
     {
         _osinfo.emplace();
@@ -39,7 +35,7 @@ info::OSInfo putils::ProbeUtilsImpl::getOSInfo()
 
     // Для того, чтобы не писать везде .value();
     auto &osinfo = _osinfo.value();
-    OSInfo output = {osinfo.sysname, osinfo.nodename, osinfo.release, 0}; 
+    OSInfo output = {osinfo.sysname, osinfo.nodename, osinfo.release, 0};
     output.arch = sysconf(_SC_LONG_BIT);
 
     return output;
@@ -47,16 +43,16 @@ info::OSInfo putils::ProbeUtilsImpl::getOSInfo()
 
 std::vector<info::UserInfo> putils::ProbeUtilsImpl::getUserInfo()
 {
-    // Не кэшируется, потому что пользователи могут добавится в 
+    // Не кэшируется, потому что пользователи могут добавится в
     // рантайме
 
     std::fstream utmpFile("/var/run/utmp",
-                           std::ios_base::in | std::ios_base::binary);
+                          std::ios_base::in | std::ios_base::binary);
     if (!utmpFile)
     {
         return {};
     }
-    
+
     std::vector<UserInfo> output;
     for (utmp userEntryRaw;
          utmpFile.read(reinterpret_cast<char *>(&userEntryRaw), sizeof(utmp));)
@@ -169,9 +165,9 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
 {
     std::system("ip -j addr show > netinfo.json");
     std::ifstream rawNInfo("netinfo.json");
-        
+
     std::vector<NetworkInterfaceInfo> output;
-    for (const auto &interface: json::parse(rawNInfo))
+    for (const auto &interface : json::parse(rawNInfo))
     {
         NetworkInterfaceInfo curIF;
         // Такое се, нужно поменять интерфейс
@@ -189,7 +185,7 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
             std::string temp;
             while (std::getline(macraw, temp, ':'))
             {
-                mac[i++] = std::stoi(temp, nullptr, 16); 
+                mac[i++] = std::stoi(temp, nullptr, 16);
             }
             curIF.mac = mac;
         }
@@ -235,22 +231,22 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
     return output;
 }
 
-info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() 
-{ 
+info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo()
+{
     CPUInfo output;
 
     output.l1_cache = 0;
     output.l2_cache = 0;
     output.l3_cache = 0;
 
-    _getCPUBasicInfo(output); 
+    _getCPUBasicInfo(output);
     _getCPUCache(output);
     _getCPULoadness(output);
 
     return output;
 }
 
-void putils::ProbeUtilsImpl::_getCPULoadness(CPUInfo &output) 
+void putils::ProbeUtilsImpl::_getCPULoadness(CPUInfo &output)
 {
     // Получаем загруженность процессора
     auto getTicks = []()
@@ -259,18 +255,20 @@ void putils::ProbeUtilsImpl::_getCPULoadness(CPUInfo &output)
         std::system("cat /proc/stat | grep \"cpu\" > loadinfo.txt");
         std::ifstream st("loadinfo.txt");
 
-        for (std::string line, stub; getline(st, line); )
+        for (std::string line, stub; getline(st, line);)
         {
             std::stringstream parsedLine(line);
             parsedLine >> stub;
-            if (stub == "cpu") continue;
+            if (stub == "cpu")
+                continue;
 
             // Числа под номерами 4,5 - такты в простое
             uint64_t all = 0, useful = 0;
             for (uint64_t i = 1, cur; parsedLine; ++i)
             {
                 parsedLine >> cur;
-                if (!(i == 4 || i == 5)) useful += cur;
+                if (!(i == 4 || i == 5))
+                    useful += cur;
                 all += cur;
             }
             output.emplace_back(useful, all);
@@ -286,11 +284,11 @@ void putils::ProbeUtilsImpl::_getCPULoadness(CPUInfo &output)
     {
         std::pair<uint64_t, uint64_t> diff = {f2[i].first - f1[i].first,
                                               f2[i].second - f1[i].second};
-        output.load.push_back(static_cast<double>(diff.first)/diff.second);
+        output.load.push_back(static_cast<double>(diff.first) / diff.second);
     }
 }
 
-void putils::ProbeUtilsImpl::_getCPUCache(CPUInfo &output) 
+void putils::ProbeUtilsImpl::_getCPUCache(CPUInfo &output)
 {
     // Получаем емкость кэшей
     std::system("lscpu -C --json --bytes > cpuinfo.json");
@@ -320,11 +318,11 @@ void putils::ProbeUtilsImpl::_getCPUCache(CPUInfo &output)
     }
 }
 
-void putils::ProbeUtilsImpl::_getCPUBasicInfo(CPUInfo &output) 
+void putils::ProbeUtilsImpl::_getCPUBasicInfo(CPUInfo &output)
 {
     getOSInfo();
     output.arch = _osinfo->machine;
-    
+
     std::ifstream rawCPUInfo("/proc/cpuinfo");
 
     // hoho haha
@@ -333,7 +331,8 @@ void putils::ProbeUtilsImpl::_getCPUBasicInfo(CPUInfo &output)
     {
         if (line.find("model name") != std::string::npos)
         {
-            output.name = std::string(line.begin() + line.find(":") + 2, line.end());
+            output.name =
+                std::string(line.begin() + line.find(":") + 2, line.end());
             ++i;
         }
         else if (line.find("cpu cores") != std::string::npos)
@@ -362,7 +361,8 @@ void putils::ProbeUtilsImpl::_getCPUBasicInfo(CPUInfo &output)
             output.overall_cache *= 1024;
             ++i;
         }
-        if (i == 5) break;
+        if (i == 5)
+            break;
     }
 }
 
@@ -375,22 +375,21 @@ info::MemoryInfo putils::ProbeUtilsImpl::getMemoryInfo()
         std::stringstream lineParsed(line);
         if (line.find("MemTotal") != std::string::npos)
         {
-            // Скипаем 
+            // Скипаем
             lineParsed >> it;
             lineParsed >> it;
             // Там все дается в килобайтах
-            output.capacity = std::stoll(it) * 1024; 
+            output.capacity = std::stoll(it) * 1024;
         }
         else if (line.find("MemAvailable") != std::string::npos)
         {
-            // Скипаем 
+            // Скипаем
             lineParsed >> it;
             lineParsed >> it;
-            output.freeSpace = std::stoll(it) * 1024; 
+            output.freeSpace = std::stoll(it) * 1024;
             // Дальше парсить смысла нет
             break;
         }
     }
     return output;
 }
-
