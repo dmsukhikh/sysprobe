@@ -273,6 +273,8 @@ void putils::ProbeUtilsImpl::_getCPULoadness(CPUInfo &output)
             }
             output.emplace_back(useful, all);
         }
+
+        std::system("rm loadinfo.txt");
         return output;
     };
 
@@ -316,6 +318,8 @@ void putils::ProbeUtilsImpl::_getCPUCache(CPUInfo &output)
             output.l3_cache = capacity;
         }
     }
+
+    std::system("rm cpuinfo.json");
 }
 
 void putils::ProbeUtilsImpl::_getCPUBasicInfo(CPUInfo &output)
