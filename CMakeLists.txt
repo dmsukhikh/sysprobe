@@ -1,14 +1,13 @@
 cmake_minimum_required(VERSION 3.5)
 project('sysprobe')
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_STANDART 17)
+set(CMAKE_CXX_STANDARD 17)
 
 # Вид сборки: Debug или Release
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Debug" FORCE)
 endif()
 
-set(COMPILE_FLAGS -std=c++17)
 # Флаги компиляции для дебаг-сборки
 if (CMAKE_BUILD_TYPE STREQUAL Debug)
     list(APPEND COMPILE_FLAGS -Wall -Wextra -Wpedantic 
@@ -32,11 +31,9 @@ add_library(probe_utilities STATIC ${CMAKE_SOURCE_DIR}/src/ProbeUtilities.cpp)
 if (WIN32)
     target_sources(probe_utilities PUBLIC 
                   ${CMAKE_SOURCE_DIR}/src/ProbeUtilsImplWin.cpp)
-    target_compile_definitions(probe_utilities PRIVATE TARGET_SYSTEM=0)
 elseif(UNIX)
     target_sources(probe_utilities PUBLIC 
                   ${CMAKE_SOURCE_DIR}/src/ProbeUtilsImplLinux.cpp)
-    target_compile_definitions(probe_utilities PRIVATE TARGET_SYSTEM=1)
 else()
     message(FATAL_ERROR "Your platform isn't valid\n"
                         "List of supported platforms: \'Linux\', \'Windows\'")

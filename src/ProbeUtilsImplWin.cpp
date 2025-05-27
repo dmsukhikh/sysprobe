@@ -1,28 +1,29 @@
+#include "windows.h"
 #include <ProbeUtilities.hpp>
 #include <ProbeUtilsImplWin.hpp>
-#include <iostream> // for debugging
-#include <sstream>
-#include "windows.h"
-#include <lm.h>
-#include <string>
 #include <array>
-#include <memory>
-#include <cstdio>
-#include <stdexcept>
-#include <chrono>
-#include <regex>
 #include <cctype>
-
+#include <chrono>
+#include <cstdio>
+#include <iostream> // for debugging
+#include <lm.h>
+#include <memory>
+#include <regex>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
 
 using putils = info::ProbeUtilities;
-putils::ProbeUtilsImpl::ProbeUtilsImpl() 
+putils::ProbeUtilsImpl::ProbeUtilsImpl()
 {
     std::cout << "compiled for windows" << std::endl;
 }
 
 putils::ProbeUtilsImpl::~ProbeUtilsImpl() {}
 
-info::OSInfo putils::ProbeUtilsImpl::getOSInfo() { 
+info::OSInfo putils::ProbeUtilsImpl::getOSInfo()
+{
     OSInfo result;
     std::string psCommand = "$os = Get-WmiObject Win32_OperatingSystem;"
                             "$os.Caption;"
@@ -42,7 +43,7 @@ info::OSInfo putils::ProbeUtilsImpl::getOSInfo() {
     if (arch_s.find("64") != std::string::npos)
     {
         arch = 64;
-    } 
+    }
     else if (arch_s.find("32") != std::string::npos)
     {
         arch = 32;
@@ -53,7 +54,7 @@ info::OSInfo putils::ProbeUtilsImpl::getOSInfo() {
 
 std::vector<info::UserInfo> putils::ProbeUtilsImpl::getUserInfo()
 {
-    // используется single-user Windows 
+    // используется single-user Windows
     UserInfo user;
     user.name = _execCommand("$env:USERNAME");
 
@@ -85,12 +86,15 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
     const size_t bufferSize = 256;
     std::array<char, bufferSize> driveBuffer{};
 
-    DWORD result = GetLogicalDriveStringsA(static_cast<DWORD>(driveBuffer.size()), driveBuffer.data());
-    if (result == 0 || result > driveBuffer.size()) {
+    DWORD result = GetLogicalDriveStringsA(
+        static_cast<DWORD>(driveBuffer.size()), driveBuffer.data());
+    if (result == 0 || result > driveBuffer.size())
+    {
         return partitions;
     }
 
-    for (auto it = driveBuffer.cbegin(); it < driveBuffer.cend() && *it != '\0'; )
+    for (auto it = driveBuffer.cbegin();
+         it < driveBuffer.cend() && *it != '\0';)
     {
         std::string drive(it);
         DiscPartitionInfo disk_info;
@@ -100,24 +104,15 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
 
         // Get file system
         std::array<char, MAX_PATH> fileSystemName;
-        GetVolumeInformationA(
-            drive.c_str(),
-            nullptr, 
-            0, 
-            nullptr, 
-            nullptr, 
-            nullptr,
-            fileSystemName.data(), 
-            sizeof fileSystemName
-        );
+        GetVolumeInformationA(drive.c_str(), nullptr, 0, nullptr, nullptr,
+                              nullptr, fileSystemName.data(),
+                              sizeof fileSystemName);
         disk_info.filesystem = fileSystemName.data();
 
         ULARGE_INTEGER freeBytesAvailable, totalBytes, totalFreeBytes;
-        if (GetDiskFreeSpaceExA(
-            drive.c_str(), 
-            &freeBytesAvailable, 
-            &totalBytes,
-            &totalFreeBytes)) {
+        if (GetDiskFreeSpaceExA(drive.c_str(), &freeBytesAvailable, &totalBytes,
+                                &totalFreeBytes))
+        {
             disk_info.capacity = totalBytes.QuadPart;
             disk_info.freeSpace = totalFreeBytes.QuadPart;
         }
@@ -132,8 +127,8 @@ putils::ProbeUtilsImpl::getDiscPartitionInfo()
 std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
 {
     std::vector<info::PeripheryInfo> result;
-       
-    //Парсим тип и имя
+
+    // Парсим тип и имя
     std::regex nameRegex(R"(NAME:(.*))");
     std::regex typeRegex(R"(TYPE:(.*))");
 
@@ -157,10 +152,12 @@ std::vector<info::PeripheryInfo> putils::ProbeUtilsImpl::getPeripheryInfo()
         {
             name = match[1];
         }
-        else if (std::regex_match(line, match, typeRegex)){
+        else if (std::regex_match(line, match, typeRegex))
+        {
             type = match[1];
             size_t pos = type.find('\\');
-            if (pos != std::string::npos && std::isalpha(type[0])) {
+            if (pos != std::string::npos && std::isalpha(type[0]))
+            {
                 type = type.substr(0, pos);
             }
 
@@ -180,13 +177,15 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
 {
     std::vector<info::NetworkInterfaceInfo> result;
     // Берем сетевые адаптеры, для которых включена IP-конфигурация.
-    std::string psCommand = "$netAdap = Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object{$_.IPEnabled}; "
-                            "foreach ($obj in $netAdap){ "
-                            "$obj.Description; "
-                            "$obj.MACAddress; "
-                            "$obj.IPAddress; " 
-                            "$obj.IPSubnet; "
-                            "}";
+    std::string psCommand =
+        "$netAdap = Get-WmiObject Win32_NetworkAdapterConfiguration | "
+        "Where-Object{$_.IPEnabled}; "
+        "foreach ($obj in $netAdap){ "
+        "$obj.Description; "
+        "$obj.MACAddress; "
+        "$obj.IPAddress; "
+        "$obj.IPSubnet; "
+        "}";
     std::string line;
     std::istringstream iss{_execCommand(psCommand)};
     int k = 0;
@@ -217,7 +216,7 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
         else if (k == 4)
             netInfo.ipv4_mask = countOnes(_splitLine<4>(line, '.', 10));
         else
-        { 
+        {
             netInfo.ipv6_mask = static_cast<uint8_t>(std::stoi(line));
             k = -1;
             result.push_back(netInfo);
@@ -225,16 +224,16 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
         }
         k++;
     }
-    
+
     return result;
 }
 
-info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() { 
+info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo()
+{
     std::unordered_map<int, std::string> archs = {
         {0, "x86"}, {1, "MIPS"},    {2, "Alpha"}, {3, "PowerPC"},
         {4, "ARM"}, {5, "Itanium"}, {6, "ia64"},  {9, "x64"},
     };
-
 
     info::CPUInfo info{};
     std::string psCommand = "$cpu = Get-WmiObject Win32_Processor;"
@@ -250,7 +249,7 @@ info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() {
                             "}";
     std::istringstream WMI(_execCommand(psCommand));
     std::string line;
-        
+
     std::getline(WMI, info.name);
 
     std::getline(WMI, line);
@@ -269,18 +268,15 @@ info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() {
 
     info.l1_cache = 0; // Wmi пометил L1CacheSize как not implemented
     std::getline(WMI, line);
-    info.l2_cache =
-        static_cast<uint32_t>(std::stoi(line));
+    info.l2_cache = static_cast<uint32_t>(std::stoi(line));
 
     std::getline(WMI, line);
-    info.l3_cache =
-        static_cast<uint32_t>(std::stoi(line));
+    info.l3_cache = static_cast<uint32_t>(std::stoi(line));
 
     info.overall_cache = info.l1_cache + info.l2_cache + info.l3_cache;
     // ProcessorId - hex строка
     std::getline(WMI, line);
-    info.physid = static_cast<uint64_t>(std::stoull(
-        line, nullptr, 16));
+    info.physid = static_cast<uint64_t>(std::stoull(line, nullptr, 16));
 
     std::getline(WMI, line);
     info.clockFreq = std::stof(line);
@@ -331,7 +327,7 @@ std::string putils::ProbeUtilsImpl::_execCommand(const std::string &command)
 
     BOOL success =
         CreateProcessA(nullptr, cmdLine.data(), nullptr, nullptr,
-                       TRUE,             // Наследование дескрипторов
+                       TRUE, // Наследование дескрипторов
                        CREATE_NO_WINDOW, // Не показывать окно консоли
                        nullptr, nullptr,
                        &si, // STARTUPINFO
@@ -372,9 +368,9 @@ std::string putils::ProbeUtilsImpl::_execCommand(const std::string &command)
 }
 
 template <size_t N>
-std::array<uint8_t, N> 
-putils::ProbeUtilsImpl::_splitLine(const std::string &mac,
-                                  char delimiter, int base)
+std::array<uint8_t, N>
+putils::ProbeUtilsImpl::_splitLine(const std::string &mac, char delimiter,
+                                   int base)
 {
     std::istringstream iss(mac);
     std::array<uint8_t, N> tokens{};
@@ -387,7 +383,7 @@ putils::ProbeUtilsImpl::_splitLine(const std::string &mac,
         {
             tokens[i] = static_cast<uint8_t>(std::stoi(token, nullptr, base));
         }
-        catch (const std::invalid_argument& e)
+        catch (const std::invalid_argument &e)
         {
             tokens[i] = 0;
         }
@@ -448,7 +444,7 @@ putils::ProbeUtilsImpl::_splitIPv6(const std::string &ipv6)
             break;
         uint16_t val = static_cast<uint16_t>(std::stoi(seg, nullptr, 16));
         result[idx++] = static_cast<uint8_t>((val >> 8) & 0xFF); // старший байт
-        result[idx++] = static_cast<uint8_t>(val & 0xFF);        // младший байт
+        result[idx++] = static_cast<uint8_t>(val & 0xFF); // младший байт
     }
 
     return result;

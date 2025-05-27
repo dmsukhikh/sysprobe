@@ -2,12 +2,12 @@
 #define __PROBE_UTILITIES
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <memory>
-#include <string>
-#include <chrono>
-#include <vector>
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace info
 {
@@ -59,7 +59,7 @@ struct NetworkInterfaceInfo
     std::string name;
     std::optional<std::array<uint8_t, 6>> mac; // вопросик...
     std::optional<std::array<uint8_t, 4>> ipv4;
-    std::optional<std::array<uint8_t, 16>> ipv6;  
+    std::optional<std::array<uint8_t, 16>> ipv6;
     uint8_t ipv4_mask; // хранится в сжатом виде: число единичек
     uint8_t ipv6_mask;
     /* В стандартой библиотеке C++ нет библиотеки для работы с сетью, так что
@@ -92,8 +92,6 @@ struct MemoryInfo
 class ProbeUtilities
 {
   public:
-
-
     ProbeUtilities();
 
     // Нам нет смысла копировать/перемещать объект интерфейса
