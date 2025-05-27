@@ -1,14 +1,14 @@
 #ifndef __PROBE_UTILS_IMPL_LINUX
 #define __PROBE_UTILS_IMPL_LINUX
-#include <nlohmann/json.hpp>
 #include <ProbeUtilities.hpp>
-#include <unordered_set>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <sys/utsname.h>
+#include <unordered_set>
 
 /*
  * Класс-реализация сканирования системы для ОС Windows
- * Одновременно должен быть включен только один файл: 
+ * Одновременно должен быть включен только один файл:
  * ProbeUtilsImplLinux или ProbeUtilsImplWin
  * */
 
