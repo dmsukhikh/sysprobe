@@ -1,12 +1,12 @@
-#if TARGET_SYSTEM == 0
-#include <ProbeUtilsImplWin.hpp>
-#elif TARGET_SYSTEM == 1
+#if __linux__
 #include <ProbeUtilsImplLinux.hpp>
+#elif _WIN64 || _WIN32
+#include <ProbeUtilsImplWin.hpp>
 #else
 static_assert(false, "Unknown target system. See CMakeLists for info");
 #endif
 
-#include <ProbeUtilities.hpp>
+#include "ProbeUtilities.hpp"
 
 info::ProbeUtilities::ProbeUtilities() : _impl(new ProbeUtilsImpl) {}
 
@@ -41,4 +41,4 @@ info::CPUInfo info::ProbeUtilities::getCPUInfo() { return _impl->getCPUInfo(); }
 info::MemoryInfo info::ProbeUtilities::getMemoryInfo()
 {
     return _impl->getMemoryInfo();
-};
+}
