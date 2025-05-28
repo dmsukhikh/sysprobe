@@ -133,7 +133,6 @@ struct CPUInfo
         l2_cache,            ///< Емкость L2-кэша, в байтах
         l3_cache,            ///< Емкость L3-кэша, в байтах
         overall_cache;       ///< Общая емкость кэша, в байтах
-
     uint64_t physid; ///< Physical ID процессора
     float clockFreq; ///< Текущая рабочая частота процессора, в мегагерцах
 };
@@ -234,6 +233,8 @@ class ProbeUtilities
      * центральном процессоре системы
      */
     CPUInfo getCPUInfo();
+
+    MemoryInfo getMemoryInfo();
 
   private:
     class ProbeUtilsImpl;
