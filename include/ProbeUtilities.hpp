@@ -234,8 +234,6 @@ class ProbeUtilities
      */
     CPUInfo getCPUInfo();
 
-    MemoryInfo getMemoryInfo();
-
   private:
     class ProbeUtilsImpl;
     std::unique_ptr<ProbeUtilsImpl> _impl;
