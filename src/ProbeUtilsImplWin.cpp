@@ -241,12 +241,12 @@ info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo()
                             "$processor.Name;"
                             "$processor.Architecture;"
                             "$processor.NumberOfCores;"
-                            "$processor.L1CacheSize;"
                             "$processor.L2CacheSize;"
                             "$processor.L3CacheSize;"
                             "$processor.ProcessorId;"
                             "$processor.CurrentClockSpeed;"
                             "}";
+    //"$processor.L1CacheSize;" - not implemented
     std::istringstream WMI(_execCommand(psCommand));
     std::string line;
 
@@ -266,7 +266,7 @@ info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo()
     std::getline(WMI, line);
     info.cores = static_cast<uint8_t>(std::stoi(line));
 
-    info.l1_cache = 0; // Wmi пометил L1CacheSize как not implemented
+    info.l1_cache = 0;
     std::getline(WMI, line);
     info.l2_cache = static_cast<uint32_t>(std::stoi(line));
 
@@ -280,6 +280,16 @@ info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo()
 
     std::getline(WMI, line);
     info.clockFreq = std::stof(line);
+
+    psCommand =
+        "(Get-WmiObject "
+        "Win32_PerfFormattedData_PerfOS_Processor).PercentProcessorTime";
+    std::istringstream WMI2(_execCommand(psCommand));
+    while (std::getline(WMI2, line))
+    {
+        info.load.push_back(std::stof(line) / 100.f);
+    }
+    info.load.pop_back(); // убираем общую загрузку ядер
 
     return info;
 }
