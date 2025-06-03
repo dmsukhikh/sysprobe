@@ -228,12 +228,12 @@ putils::ProbeUtilsImpl::getNetworkInterfaceInfo()
     return result;
 }
 
-info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo()
-{
+info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo() { 
     std::unordered_map<int, std::string> archs = {
         {0, "x86"}, {1, "MIPS"},    {2, "Alpha"}, {3, "PowerPC"},
         {4, "ARM"}, {5, "Itanium"}, {6, "ia64"},  {9, "x64"},
     };
+
 
     info::CPUInfo info{};
     std::string psCommand = "$cpu = Get-WmiObject Win32_Processor;"
@@ -241,15 +241,15 @@ info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo()
                             "$processor.Name;"
                             "$processor.Architecture;"
                             "$processor.NumberOfCores;"
-                            "$processor.L1CacheSize;"
                             "$processor.L2CacheSize;"
                             "$processor.L3CacheSize;"
                             "$processor.ProcessorId;"
                             "$processor.CurrentClockSpeed;"
                             "}";
+    //"$processor.L1CacheSize;" - not implemented
     std::istringstream WMI(_execCommand(psCommand));
     std::string line;
-
+        
     std::getline(WMI, info.name);
 
     std::getline(WMI, line);
@@ -266,20 +266,32 @@ info::CPUInfo putils::ProbeUtilsImpl::getCPUInfo()
     std::getline(WMI, line);
     info.cores = static_cast<uint8_t>(std::stoi(line));
 
-    info.l1_cache = 0; // Wmi пометил L1CacheSize как not implemented
+    info.l1_cache = 0;
     std::getline(WMI, line);
-    info.l2_cache = static_cast<uint32_t>(std::stoi(line));
+    info.l2_cache =
+        static_cast<uint32_t>(std::stoi(line));
 
     std::getline(WMI, line);
-    info.l3_cache = static_cast<uint32_t>(std::stoi(line));
+    info.l3_cache =
+        static_cast<uint32_t>(std::stoi(line));
 
     info.overall_cache = info.l1_cache + info.l2_cache + info.l3_cache;
     // ProcessorId - hex строка
     std::getline(WMI, line);
-    info.physid = static_cast<uint64_t>(std::stoull(line, nullptr, 16));
+    info.physid = static_cast<uint64_t>(std::stoull(
+        line, nullptr, 16));
 
     std::getline(WMI, line);
     info.clockFreq = std::stof(line);
+
+
+    psCommand = "(Get-WmiObject Win32_PerfFormattedData_PerfOS_Processor).PercentProcessorTime";
+    std::istringstream WMI2(_execCommand(psCommand));
+    while (std::getline(WMI2, line))
+    {
+        info.load.push_back(std::stof(line) / 100.f);
+    }
+    info.load.pop_back(); // убираем общую загрузку ядер
 
     return info;
 }
